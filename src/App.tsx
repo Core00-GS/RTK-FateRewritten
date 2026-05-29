@@ -17,10 +17,11 @@ import FactionDiplomacy from './components/FactionDiplomacy';
 import RandomEventsTab from './components/RandomEventsTab';
 import CivilianModsTab from './components/CivilianModsTab';
 import { sfx } from './utils/audio';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { 
   Skull, Sparkles, BookOpen, Map, Landmark, Users, 
   HelpCircle, Archive, RotateCcw, Save, ShieldCheck, 
-  Trash2, Award, ShieldAlert, Swords, Quote, Calendar, Coins, Volume2, VolumeX, AlertCircle, Info
+  Trash2, Award, ShieldAlert, Swords, Quote, Calendar, Coins, Volume2, VolumeX, AlertCircle, Info, X
 } from 'lucide-react';
 
 const SAVE_KEY = 'three_kingdoms_retro_alt_save_v2';
@@ -46,6 +47,7 @@ export default function App() {
   const [sanCount, setSanCount] = useState<number>(0);
   const [guoCount, setGuoCount] = useState<number>(0);
   const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
+  const [showPlayerModal, setShowPlayerModal] = useState<boolean>(false);
   const [passwordInput, setPasswordInput] = useState<string>('');
   const [testModeActive, setTestModeActive] = useState<boolean>(false);
   
@@ -59,9 +61,9 @@ export default function App() {
     leadership: 60,
     politics: 60,
     virtue: 60,
-    troops: 1000,
+    troops: 0,
     gold: 500,
-    prestige: 100,
+    prestige: 0,
     popularity: 100,
     year: 177,
     month: 1,
@@ -86,6 +88,17 @@ export default function App() {
   const [activeQuests, setActiveQuests] = useState<string[]>([]);
   const [regions, setRegions] = useState<Region[]>(INITIAL_REGIONS);
   const [currentSceneId, setCurrentSceneId] = useState<string>('c1_0');
+  const [currentCG, setCurrentCG] = useState<string | null>(null);
+
+  useEffect(() => {
+    const scene = GAME_SCENES[currentSceneId];
+    if (scene && scene.cgImage) {
+      setCurrentCG(scene.cgImage);
+    } else {
+      setCurrentCG(null);
+    }
+  }, [currentSceneId]);
+
   const [currentChapterId, setCurrentChapterId] = useState<string>('c1');
   const [historyRecords, setHistoryRecords] = useState<HistoryRecord[]>([]);
   const [expandedHistoryFacts, setExpandedHistoryFacts] = useState<Record<string, boolean>>({});
@@ -345,9 +358,9 @@ export default function App() {
           leadership: 60,
           politics: 60,
           virtue: 60,
-          troops: 1000,
+          troops: 0,
           gold: 500,
-          prestige: 100,
+          prestige: 0,
           popularity: 100,
           year: 177,
           month: 1,
@@ -408,14 +421,12 @@ export default function App() {
     }
 
     let startingGold = 500;
-    let startingTroops = 1200;
+    let startingTroops = 0;
 
     if (playerStats.difficulty === 'easy') {
       startingGold = 1000;
-      startingTroops = 2000;
     } else if (playerStats.difficulty === 'hard') {
       startingGold = 250;
-      startingTroops = 750;
     }
     
     const initialStats: PlayerStats = {
@@ -427,7 +438,7 @@ export default function App() {
       virtue: builderStats.virtue,
       troops: startingTroops,
       gold: startingGold,
-      prestige: 100,
+      prestige: 0,
       popularity: 100,
       year: 177,
       month: 1,
@@ -1342,10 +1353,18 @@ export default function App() {
           {/* Main callout HUD bar */}
           <div className="bg-artistic-cream border-2 border-artistic-charcoal p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 items-center shadow-sm">
             {/* Identity node */}
-            <div className="border-r border-artistic-charcoal/25 pr-2">
-              <div className="font-serif text-[10.5px] text-artistic-charcoal/80 uppercase">麾下名主：</div>
-              <h2 className="font-serif font-black text-artistic-ink text-base tracking-wide">{playerStats.name}</h2>
-              <span className="text-[10px] bg-artistic-charcoal text-artistic-bg px-2 py-0.5 mt-1 inline-block font-serif font-bold">
+            <div 
+              onClick={() => setShowPlayerModal(true)}
+              className="border-r border-artistic-charcoal/25 pr-2 group cursor-pointer hover:bg-artistic-charcoal/5 p-1 transition-all duration-200 rounded-none border border-dashed border-transparent hover:border-artistic-charcoal/25 relative"
+              title="点击打开主公个人底案，查阅五围天资与等级大印"
+            >
+              <div className="font-serif text-[9.5px] text-stone-500 uppercase flex justify-between items-center">
+                <span>麾下名主 (点击阅览) 🔍</span>
+              </div>
+              <h2 className="font-serif font-black text-[#5c0f11] text-base tracking-wider group-hover:underline flex items-center gap-1">
+                👑 {playerStats.name}
+              </h2>
+              <span className="text-[9.5px] bg-artistic-charcoal text-[#f2e6d0] px-1.5 py-0.5 mt-0.5 inline-block font-serif font-bold leading-none transform group-hover:scale-105 transition-all">
                 字 {playerStats.courtesyName}
               </span>
             </div>
@@ -1521,10 +1540,37 @@ export default function App() {
                         记录由于主公决策折损、敌军歼灭、精锐纳兵与征赋进度：
                       </p>
 
+                      {/* Dynamic Battle Log Filter Buttons */}
+                      <div className="flex flex-wrap gap-1.5 mb-2.5 pb-2 border-b border-stone-200">
+                        {[
+                          { id: 'all', label: '全部' },
+                          { id: 'action', label: '军务' },
+                          { id: 'casualty', label: '兵损☠️' },
+                          { id: 'gain', label: '资益🌾' },
+                          { id: 'random_event', label: '奇遇🌠' }
+                        ].map((filterItem) => (
+                          <button
+                            key={filterItem.id}
+                            onClick={() => { sfx.playClick(); setBattleLogFilter(filterItem.id as any); }}
+                            className={`px-2 py-1 text-[10px] font-serif border font-bold transition-all cursor-pointer ${
+                              battleLogFilter === filterItem.id
+                                ? 'bg-artistic-charcoal border-artistic-charcoal text-[#ede0c5]'
+                                : 'bg-transparent border-stone-300 text-stone-600 hover:bg-stone-100'
+                            }`}
+                          >
+                            {filterItem.label}
+                          </button>
+                        ))}
+                      </div>
+
                       <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 scrollbar-ink">
-                        {battleLogs.filter(log => log.chapterId === currentChapterId || log.id === 'init_log').length > 0 ? (
+                        {battleLogs
+                          .filter(log => log.chapterId === currentChapterId || log.id === 'init_log')
+                          .filter(log => battleLogFilter === 'all' || log.type === battleLogFilter)
+                          .length > 0 ? (
                           battleLogs
                             .filter(log => log.chapterId === currentChapterId || log.id === 'init_log')
+                            .filter(log => battleLogFilter === 'all' || log.type === battleLogFilter)
                             .map((log) => {
                               let bgStyle = "bg-stone-50 border-stone-200 text-stone-900 border-l-2 border-l-stone-500";
                               if (log.type === 'casualty') bgStyle = "bg-red-50/90 border-red-300 text-red-950 border-l-2 border-l-artistic-crimson";
@@ -1545,7 +1591,7 @@ export default function App() {
                             })
                         ) : (
                           <div className="text-center py-6 text-xs text-artistic-charcoal opacity-60 italic">
-                            本章节暂无激烈交锋记录
+                            筛选分类下暂无对应事件交锋
                           </div>
                         )}
                       </div>
@@ -1590,11 +1636,62 @@ export default function App() {
                           }
                         });
 
+                        // Prepare recharts dynamic trend data for military and fiscal assets
+                        const chartData = (() => {
+                          let runningTroopsChange = 1000; // start with a relative baseline
+                          let runningGoldChange = 500;
+                          
+                          // Chronological history of events in the current chapter
+                          const historyPoints = logs.map((log, index) => {
+                            const msg = log.message;
+
+                            // Analyze troops changes
+                            let troopChange = 0;
+                            const lossTr = msg.match(/(?:折损|战损|损兵|扣除|兵力减少|伤亡|损兵折将|折损兵马|兵力\s*-\s*|军旅折损\s*-\s*|兵卒\s*-\s*|军卒折损\s*-\s*|减少)\s*[-]?\s*(\d+)/);
+                            const gainTr = msg.match(/(?:募集|征募|吸纳|俘获|新卒|大军增配|募得新卒|招募|招兵|兵马增加|新增|新卒\s*\+\s*|兵卒\s*\+\s*|兵力\s*\+\s*)\s*[\+]?\s*(\d+)/);
+                            if (lossTr) {
+                              troopChange = -parseInt(lossTr[1], 10);
+                            } else if (gainTr) {
+                              troopChange = parseInt(gainTr[1], 10);
+                            } else if (msg.includes('减少') && msg.includes('兵')) {
+                              const match = msg.match(/(\d+)\s*兵/);
+                              if (match) troopChange = -parseInt(match[1], 10);
+                            }
+
+                            // Analyze gold changes
+                            let goldChange = 0;
+                            const lossG = msg.match(/(?:消耗|扣除|花费|支付|流失|黄金\s*-\s*|扣除黄金|黄金跌落\s*-\s*|放粥\s*-\s*|损失\s*-\s*|损失)\s*[-]?\s*(\d+)/);
+                            const gainG = msg.match(/(?:博得|岁入|黄金增加|获得|俸禄\s*\+\s*|征得|赋税\s*\+\s*|税款\s*\+\s*|黄金\s*\+\s*|征收|秋收|缴得|黄金\s*.*\+\s*)\s*[\+]?\s*(\d+)/);
+                            if (lossG) {
+                              goldChange = -parseInt(lossG[1], 10);
+                            } else if (gainG) {
+                              goldChange = parseInt(gainG[1], 10);
+                            }
+
+                            runningTroopsChange += troopChange;
+                            runningGoldChange += goldChange;
+
+                            return {
+                              name: `${index + 1}幕`,
+                              "兵马趋势": runningTroopsChange,
+                              "黄金趋势": runningGoldChange
+                            };
+                          });
+
+                          // Ensure we have a default baseline if no logs
+                          if (historyPoints.length === 0) {
+                            return [
+                              { name: "初始", "兵马趋势": 0, "黄金趋势": 500 }
+                            ];
+                          }
+                          return historyPoints;
+                        })();
+
                         return (
                           <div id="battle-attrition-summary" className="mt-3.5 pt-3.5 border-t border-dashed border-artistic-charcoal/30 text-left text-[10px] font-serif bg-artistic-cream/70 p-2.5 rounded-none shadow-xs">
                             <div className="font-bold border-b border-artistic-charcoal/20 pb-1 mb-1.5 text-stone-900 flex justify-between tracking-wide">
-                              <span>📊 麾下本章损益总览 (Chapter Attrition)</span>
-                              <span className="text-artistic-crimson font-black">本章汇总</span>
+                              <span>📊 麾下本章损益与历史趋势 (Chapter Attrition & Trend)</span>
+                              <span className="text-artistic-crimson font-black">时政盘点</span>
                             </div>
                             <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 text-stone-700">
                               <div className="flex justify-between items-center">
@@ -1612,6 +1709,35 @@ export default function App() {
                               <div className="flex justify-between items-center">
                                 <span>💰 收获税粮岁入:</span>
                                 <span className="font-mono text-emerald-700 font-bold">+{goldGained}</span>
+                              </div>
+                            </div>
+
+                            {/* Recharts trend visualization inside the block */}
+                            <div className="mt-3 pt-2.5 border-t border-stone-300">
+                              <div className="w-full h-[120px] bg-white border border-stone-200/60 p-1 rounded-none shadow-inner">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                                    <defs>
+                                      <linearGradient id="troopsGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#8d1d1f" stopOpacity={0.16}/>
+                                        <stop offset="95%" stopColor="#8d1d1f" stopOpacity={0}/>
+                                      </linearGradient>
+                                      <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#d97706" stopOpacity={0.16}/>
+                                        <stop offset="95%" stopColor="#d97706" stopOpacity={0}/>
+                                      </linearGradient>
+                                    </defs>
+                                    <CartesianGrid stroke="#f1e0c6" strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="name" stroke="#78716c" fontSize={8} tickLine={false} />
+                                    <YAxis stroke="#78716c" fontSize={8} tickLine={false} />
+                                    <Tooltip 
+                                      contentStyle={{ backgroundColor: '#fcfaf2', border: '1px solid #78716c', fontSize: '9px', padding: '4px' }}
+                                      labelStyle={{ fontWeight: 'bold', color: '#5c0f11' }}
+                                    />
+                                    <Area type="monotone" dataKey="兵马趋势" stroke="#8d1d1f" strokeWidth={1.2} fillOpacity={1} fill="url(#troopsGrad)" name="兵数趋势" />
+                                    <Area type="monotone" dataKey="黄金趋势" stroke="#d97706" strokeWidth={1.2} fillOpacity={1} fill="url(#goldGrad)" name="黄金趋势" />
+                                  </AreaChart>
+                                </ResponsiveContainer>
                               </div>
                             </div>
                           </div>
@@ -2132,6 +2258,251 @@ export default function App() {
         </div>
       )}
 
+
+      {/* Sovereign Player Profile Modal */}
+      {showPlayerModal && (() => {
+        const playerTotalStats = playerStats.force + playerStats.intelligence + playerStats.leadership + playerStats.politics + playerStats.virtue;
+        const playerLevel = Math.max(1, Math.floor((playerTotalStats - 160) / 8));
+        const nextLevelStatsNeeded = 160 + (playerLevel * 8);
+        const prevLevelStatsNeeded = 160 + ((playerLevel - 1) * 8);
+        const xpProgress = Math.min(8, Math.max(0, playerTotalStats - prevLevelStatsNeeded));
+        const xpPercentage = Math.min(100, Math.max(0, Math.round((xpProgress / 8) * 100)));
+
+        // Level Title
+        let levelTitle = "乡村义武贤";
+        if (playerLevel >= 25) levelTitle = "九汉天命圣皇 👑";
+        else if (playerLevel >= 18) levelTitle = "中兴大司马辅国将 ⚔️";
+        else if (playerLevel >= 12) levelTitle = "威威安邦大刺史 📜";
+        else if (playerLevel >= 6) levelTitle = "建义偏将虎臣侯 🛡️";
+        else levelTitle = "涿郡结发义功首 🌾";
+
+        // SVG math coordinate builders for dynamic player radar chart
+        const playerGetCoords = (val: number, idx: number) => {
+          const angle = -Math.PI / 2 + (idx * 2 * Math.PI) / 5;
+          const r = (val / 100) * 75; // Max radius 75
+          return {
+            x: 100 + r * Math.cos(angle),
+            y: 100 + r * Math.sin(angle)
+          };
+        };
+
+        const gridRings = [20, 40, 60, 80, 100];
+        const spokeLabels = [
+          { text: "武力", idx: 0, dx: 0, dy: -8 },
+          { text: "智力", idx: 1, dx: 14, dy: 3 },
+          { text: "统帅", idx: 2, dx: 10, dy: 14 },
+          { text: "政治", idx: 3, dx: -10, dy: 14 },
+          { text: "德行", idx: 4, dx: -14, dy: 3 },
+        ];
+
+        const pts = [
+          playerGetCoords(playerStats.force, 0),
+          playerGetCoords(playerStats.intelligence, 1),
+          playerGetCoords(playerStats.leadership, 2),
+          playerGetCoords(playerStats.politics, 3),
+          playerGetCoords(playerStats.virtue, 4),
+        ];
+        const playerPolygon = pts.map(p => `${p.x},${p.y}`).join(' ');
+
+        return (
+          <div className="fixed inset-0 bg-artistic-charcoal/85 backdrop-blur-xs flex items-center justify-center p-4 z-[150] animate-fade-in text-[#2a2319]">
+            <div className="bg-[#fcfaf2] border-4 border-double border-artistic-charcoal max-w-xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto scrollbar-ink font-serif text-left">
+              
+              {/* Jade seal watermark background */}
+              <div className="absolute top-2 right-2 text-6xl opacity-[0.04] pointer-events-none select-none font-sans font-black">
+                漢
+              </div>
+
+              {/* Header block */}
+              <div className="border-b-2 border-artistic-charcoal pb-3.5 mb-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => { sfx.playClick(); setShowPlayerModal(false); }}
+                  className="absolute top-4 right-4 text-stone-400 hover:text-artistic-crimson transition-all cursor-pointer border border-stone-300 hover:border-artistic-crimson bg-[#fcfaf2] w-6 h-6 flex items-center justify-center"
+                  title="合案归本"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-[10px] bg-[#5c0f11] text-[#f2e6d0] px-3 py-0.5 tracking-widest font-black uppercase mb-1 inline-block">
+                  汉室中兴册勋底卷
+                </span>
+                <h3 className="text-xl font-serif font-black text-artistic-charcoal flex justify-center items-center gap-1 mt-1">
+                  ⚔️ {playerStats.name}（字 {playerStats.courtesyName}）
+                </h3>
+                <p className="text-[10.5px] text-stone-500 font-serif font-bold mt-1">
+                  当前勋爵官衔: <span className="text-artistic-crimson">【{playerStats.title || "布衣义勇校尉"}】</span>
+                </p>
+              </div>
+
+              {/* Grid split: Radar and stats details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                {/* Visual Player Radar Plot SVG */}
+                <div className="flex flex-col items-center justify-center">
+                  <div className="w-[200px] h-[200px] bg-white border border-stone-300/40 p-1 rounded-none shadow-inner relative flex items-center justify-center">
+                    <svg viewBox="0 0 200 200" className="w-[190px] h-[190px]">
+                      {/* Grid concentric rings */}
+                      {gridRings.map(v => {
+                        const rPoints = [];
+                        for (let i = 0; i < 5; i++) {
+                          const pc = playerGetCoords(v, i);
+                          rPoints.push(`${pc.x},${pc.y}`);
+                        }
+                        return (
+                          <polygon
+                            key={v}
+                            points={rPoints.join(' ')}
+                            fill="none"
+                            stroke="#e5dbca"
+                            strokeWidth="0.7"
+                            strokeDasharray="2,2"
+                          />
+                        );
+                      })}
+
+                      {/* Axis lines */}
+                      {[0,1,2,3,4].map(i => {
+                        const end = playerGetCoords(100, i);
+                        return (
+                          <line
+                            key={i}
+                            x1="100"
+                            y1="100"
+                            x2={end.x}
+                            y2={end.y}
+                            stroke="#e5dbca"
+                            strokeWidth="0.8"
+                          />
+                        );
+                      })}
+
+                      {/* Solid polygon area fill for Player Stats */}
+                      <polygon
+                        points={playerPolygon}
+                        fill="rgba(139, 0, 0, 0.16)"
+                        stroke="#8b0000"
+                        strokeWidth="1.8"
+                      />
+
+                      {/* Vertex circles indicator */}
+                      {pts.map((p, i) => (
+                        <circle
+                          key={i}
+                          cx={p.x}
+                          cy={p.y}
+                          r="3"
+                          fill="#8b0000"
+                          stroke="#ffffff"
+                          strokeWidth="1"
+                        />
+                      ))}
+
+                      {/* Text text nodes */}
+                      {spokeLabels.map(l => {
+                        const borderPt = playerGetCoords(114, l.idx);
+                        return (
+                          <text
+                            key={l.text}
+                            x={borderPt.x + l.dx}
+                            y={borderPt.y + l.dy}
+                            textAnchor="middle"
+                            className="fill-stone-700 text-[10px] font-serif font-black"
+                          >
+                            {l.text}
+                          </text>
+                        );
+                      })}
+                    </svg>
+                  </div>
+                  <span className="text-[9px] text-[#5c0f11]/70 font-mono mt-1 font-bold">主公五维天资雷达星象图</span>
+                </div>
+
+                {/* Sub attributes and leveling panel */}
+                <div className="space-y-3.5 bg-[#faf5ec]/80 border border-stone-300/40 p-3 rounded-none">
+                  {/* Level system card */}
+                  <div className="border-b border-stone-300 pb-2 flex gap-2.5 items-center">
+                    <div className="w-11 h-11 bg-[#8b0000] text-amber-100 border-2 border-stone-800 flex flex-col items-center justify-center shrink-0 shadow-sm leading-none rounded-none">
+                      <span className="text-[8px] font-sans">勋位</span>
+                      <span className="text-base font-serif font-black">{playerLevel}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] text-stone-500 uppercase font-bold leading-none">勋略天威等阶 (Level)</div>
+                      <h4 className="font-serif font-black text-stone-850 text-xs mt-0.5 truncate">{levelTitle}</h4>
+                      
+                      {/* XP Bar Progress */}
+                      <div className="mt-1 flex items-center gap-1 text-[9px] font-mono text-stone-500">
+                        <div className="flex-1 bg-stone-200 h-1.5 rounded-none border border-stone-300 overflow-hidden relative">
+                          <div className="bg-[#8b0000] h-full transition-all duration-300" style={{ width: `${xpPercentage}%` }}></div>
+                        </div>
+                        <span className="shrink-0 font-bold text-stone-700">{xpProgress}/8 魄</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Attributes Progression Grids */}
+                  <div className="space-y-1.5 text-[11px]">
+                    <div className="flex justify-between items-center border-b border-dashed border-stone-300/60 pb-0.5">
+                      <span className="font-serif text-stone-600 font-bold">武力 (斗斩锋刃)</span>
+                      <span className="font-sans font-bold text-red-800">{playerStats.force} / 100</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-dashed border-stone-300/60 pb-0.5">
+                      <span className="font-serif text-stone-600 font-bold">智力 (计策奇谋)</span>
+                      <span className="font-sans font-bold text-blue-800">{playerStats.intelligence} / 100</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-dashed border-stone-300/60 pb-0.5">
+                      <span className="font-serif text-stone-600 font-bold">统帅 (三军调兵)</span>
+                      <span className="font-sans font-bold text-emerald-800">{playerStats.leadership} / 100</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-dashed border-stone-300/60 pb-0.5">
+                      <span className="font-serif text-stone-600 font-bold">政治 (屯垦吏治)</span>
+                      <span className="font-sans font-bold text-amber-800">{playerStats.politics} / 100</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-dashed border-stone-300/60 pb-0.5">
+                      <span className="font-serif text-stone-600 font-bold">德行 (纳贤抚民)</span>
+                      <span className="font-sans font-bold text-purple-800">{playerStats.virtue} / 100</span>
+                    </div>
+                  </div>
+
+                  <p className="text-[9px] text-[#5c0f11] bg-amber-50 border border-amber-200/50 p-1 font-serif leading-snug">
+                    💡 提示: 主公在“内政”中耕耘、在“寻访奇遇”中修行，或通过推进“史册主线”获得属性增幅。每提升 8 点任意属性即可唤醒一阶兵略等功勋级！
+                  </p>
+                </div>
+              </div>
+
+              {/* Status details footer cards */}
+              <div className="mt-4 pt-3.5 border-t border-dashed border-stone-300 grid grid-cols-2 gap-3 text-xs leading-normal">
+                <div className="bg-[#fcf8f0] p-2 border border-stone-300/40 font-serif">
+                  <div className="text-[10px] text-stone-500">军中声威与民气</div>
+                  <div className="text-[11px] font-bold text-stone-850 mt-0.5">👑 名门声望: <span className="font-mono text-amber-900 font-black">{playerStats.prestige}</span></div>
+                  <div className="text-[11px] font-bold text-stone-850">👥 黎民爱戴: <span className="font-mono text-emerald-800 font-black">{playerStats.popularity}</span></div>
+                </div>
+                <div className="bg-[#fcf8f0] p-2 border border-stone-300/40 font-serif">
+                  <div className="text-[10px] text-stone-500">岁星历律载入</div>
+                  <div className="text-[11px] font-bold text-stone-850 mt-0.5">📅 当前历法: 公元 {playerStats.year} 年</div>
+                  <div className="text-[11px] font-bold text-stone-850">🍂 旬节天象: {playerStats.month}月候旬</div>
+                </div>
+              </div>
+
+              {/* Sovereign quote */}
+              <p className="text-[10px] text-stone-550 font-serif italic text-center mt-3.5 border-t border-stone-200 pt-2.5">
+                “兵民之本，在乎修己。兴义兵，靖烟尘，愿天下苍生尽开颜！”
+              </p>
+
+              {/* Action Buttons */}
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { sfx.playClick(); setShowPlayerModal(false); }}
+                  className="w-full bg-[#5c0f11] hover:bg-artistic-crimson text-[#f2e6d0] text-xs font-serif font-black py-2.5 px-3 border border-transparent rounded-none transition-all cursor-pointer text-center"
+                >
+                  合册束案 (归衙掌政)
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Easter Egg / Cheat Code Entrance Prompt */}
       {showPasswordModal && (
         <div className="fixed inset-0 bg-artistic-charcoal/85 backdrop-blur-xs flex items-center justify-center p-4 z-[150] animate-fade-in">
@@ -2362,6 +2733,53 @@ export default function App() {
                 🔥 主公圣境 (全99)
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Premium Event CG Artworks Modal (Click to Close) */}
+      {currentCG && (
+        <div id="cg-modal-overlay" className="fixed inset-0 bg-black/90 flex items-center justify-center p-6 z-[200] animate-fade-in">
+          <div className="bg-[#fbfcfa] border-8 border-double border-artistic-charcoal max-w-2xl w-full p-8 shadow-2xl relative text-center font-serif text-artistic-charcoal flex flex-col items-center">
+            
+            <div className="border-b-2 border-artistic-charcoal pb-4 w-full mb-6">
+              <h3 className="font-serif font-black text-2xl tracking-widest text-[#5c0f11]">
+                ✦ 华夏绘卷 · 历史CG ✦
+              </h3>
+              <p className="text-xs text-stone-500 font-mono mt-1">
+                PATH: ./image/CG/{currentCG}
+              </p>
+            </div>
+
+            {/* Canvas fallback for CG illustration file */}
+            <div className="w-full h-80 bg-white border-2 border-dashed border-stone-300 flex flex-col items-center justify-center p-4 mb-6 relative overflow-hidden">
+              <img 
+                src={`./image/CG/${currentCG}`} 
+                alt={currentCG}
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+                className="absolute inset-0 w-full h-full object-cover z-10"
+              />
+              <div className="flex flex-col items-center justify-center z-0 text-center select-none text-[#5c0f11] p-6">
+                <Sparkles className="w-16 h-16 opacity-35 mb-4 text-artistic-crimson" />
+                <span className="font-serif font-bold text-xl tracking-wider text-stone-800">
+                  【 {currentCG === 'taoyuan_oath.jpg' ? '桃园四杰结同盟' : '卧牛山大破裴元绍'} 】
+                </span>
+                <p className="text-xs text-stone-500 max-w-md mt-4 leading-relaxed">
+                  [ 丹青绘卷 ]：当前本地尚未加载到高清艺术CG原画。系统已在此处铺设了动态自动读取接口，后续只需在电脑的 <span className="font-mono text-xs font-bold text-artistic-crimson">"./image/CG/"</span> 文件夹中放置名为 <span className="font-mono text-xs font-bold text-artistic-crimson">"{currentCG}"</span> 的美术图文件，系统即可实现完美画卷展现！
+                </p>
+              </div>
+            </div>
+
+            <button 
+              id="close-cg-modal"
+              onClick={() => { sfx.playClick(); setCurrentCG(null); }}
+              className="px-8 py-2.5 bg-artistic-crimson border-2 border-artistic-charcoal text-[#fcfaf2] font-black text-sm tracking-widest hover:bg-[#8d1d1f] transition-colors shadow-md cursor-pointer"
+            >
+              收起画轴 (Close CG)
+            </button>
           </div>
         </div>
       )}

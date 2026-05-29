@@ -8,6 +8,52 @@ import { General, PlayerStats } from '../types';
 import { INITIAL_GENERAL_POOL } from '../data/generals';
 import { Swords, Star, Award, ShieldAlert, Heart, Trophy, BookOpen, X } from 'lucide-react';
 import GeneralAttributesChart from './GeneralAttributesChart';
+import GeneralRadarChart from './GeneralRadarChart';
+
+interface Bond {
+  id: string;
+  name: string;
+  idsRequired: string[];
+  description: string;
+  statBoost: {
+    force?: number;
+    intelligence?: number;
+    leadership?: number;
+    politics?: number;
+    virtue?: number;
+  };
+}
+
+const GENERAL_BONDS: Bond[] = [
+  {
+    id: 'taoyuan',
+    name: '👑 桃园结义 (Peach Garden Oath)',
+    idsRequired: ['liubei', 'guanyu', 'zhangfei'],
+    description: '刘、关、张同袍誓死，合心克敌。全军五维修行增益大进 (武力+10, 统帅+10, 仁德+15)！',
+    statBoost: { force: 10, leadership: 10, virtue: 15 }
+  },
+  {
+    id: 'wuhujiang',
+    name: '🐯 蜀汉虎将 (Shu Tiger generals)',
+    idsRequired: ['guanyu', 'zhangfei', 'zhaoyun'],
+    description: '关、张、赵猛虎陷敌，神力难当。冲锋阵斩效力暴进 (武力+15, 统帅+10)！',
+    statBoost: { force: 15, leadership: 10 }
+  },
+  {
+    id: 'weishi_zhi',
+    name: '🦅 魏佐雄途 (Wei Pillars of Council)',
+    idsRequired: ['caocao', 'guojia'],
+    description: '孟德、奉孝主辅知默，算无遗漏。计策成效极速提升 (智力+15, 政治+10)！',
+    statBoost: { intelligence: 15, politics: 10 }
+  },
+  {
+    id: 'wuhou_chuan',
+    name: '💡 师徒承灯 (Master & Apprentice)',
+    idsRequired: ['zhugeliang', 'jiangwei'],
+    description: '诸葛亮对姜维衣钵倾囊相授。幼麒演兵，妙理通神 (智力+12, 统帅+10)！',
+    statBoost: { intelligence: 12, leadership: 10 }
+  }
+];
 
 interface GeneralRosterProps {
   recruitedIds: string[];
@@ -335,6 +381,31 @@ export default function GeneralRoster({
 
   const displayGeneral = selectedGeneral || myGenerals[0] || recruitPool[0];
 
+  // Calculated bonds
+  const activeBondsList = GENERAL_BONDS.filter(bond =>
+    bond.idsRequired.every(id => recruitedIds.includes(id))
+  );
+
+  const generalBondsList = displayGeneral ? activeBondsList.filter(bond =>
+    bond.idsRequired.includes(displayGeneral.id)
+  ) : [];
+
+  let forceBonus = 0;
+  let intelBonus = 0;
+  let leadBonus = 0;
+  let polBonus = 0;
+  let virtBonus = 0;
+
+  if (displayGeneral) {
+    generalBondsList.forEach(bond => {
+      forceBonus += bond.statBoost.force || 0;
+      intelBonus += bond.statBoost.intelligence || 0;
+      leadBonus += bond.statBoost.leadership || 0;
+      polBonus += bond.statBoost.politics || 0;
+      virtBonus += bond.statBoost.virtue || 0;
+    });
+  }
+
   // SVG Radar Chart math solvers
   const getCoordinates = (value: number, axisIndex: number, cx: number, cy: number, maxR: number) => {
     const angle = -Math.PI / 2 + (axisIndex * 2 * Math.PI) / 5;
@@ -594,73 +665,161 @@ export default function GeneralRoster({
       <div id="roster-right-side" className="flex flex-col gap-4">
         {displayGeneral ? (
           <div className="bg-artistic-bg border-4 border-artistic-charcoal rounded-none p-5 shadow-md flex-1 flex flex-col justify-between">
-            <div>
-              {/* Card visual showcase */}
-              <div className="border-b border-artistic-charcoal pb-3 mb-4 text-center">
-                <div className="w-16 h-16 rounded-none bg-artistic-crimson/5 text-artistic-crimson border-4 border-artistic-crimson flex items-center justify-center font-bold font-serif text-2xl mx-auto mb-2 shadow-sm font-calligraphy">
-                  {displayGeneral.avatar}
+              <div>
+                {/* Card visual showcase */}
+                <div className="border-b border-artistic-charcoal pb-3 mb-4 text-center">
+                  <div className="w-16 h-16 rounded-none bg-artistic-crimson/5 text-artistic-crimson border-4 border-artistic-crimson flex items-center justify-center font-bold font-serif text-2xl mx-auto mb-2 shadow-sm font-calligraphy">
+                    {displayGeneral.avatar}
+                  </div>
+                  <h3 className="font-serif font-black text-xl text-artistic-charcoal">
+                    {displayGeneral.name}
+                  </h3>
+                  <div className="text-[10.5px] text-artistic-charcoal/90 font-serif flex justify-center gap-2 mt-1">
+                    <span>阶级: 偏将虎臣</span>
+                    <span>|</span>
+                    <span>成长等级: LV.{displayGeneral.level}</span>
+                  </div>
                 </div>
-                <h3 className="font-serif font-black text-xl text-artistic-charcoal">
-                  {displayGeneral.name}
-                </h3>
-                <div className="text-[10.5px] text-artistic-charcoal/90 font-serif flex justify-center gap-2 mt-1">
-                  <span>阶级: 偏将虎臣</span>
-                  <span>|</span>
-                  <span>成长等级: LV.{displayGeneral.level}</span>
-                </div>
-              </div>
 
-              {/* Core attributes grids with indicators */}
-              <div className="mb-4">
-                <h4 className="text-xs font-serif font-black text-artistic-crimson mb-2">【幕府武职底案】</h4>
-                <div className="space-y-2 text-xs">
-                  {/* Force */}
-                  <div>
-                    <div className="flex justify-between text-[10px] text-artistic-charcoal/90 font-serif mb-0.5">
-                      <span>武力 (阵斩斗将)</span>
-                      <span className="font-bold text-artistic-crimson">{displayGeneral.force}</span>
-                    </div>
-                    <div className="w-full bg-artistic-cream h-2 rounded-none border border-artistic-charcoal/35 overflow-hidden">
-                      <div className="bg-artistic-crimson h-full" style={{ width: `${displayGeneral.force}%` }}></div>
-                    </div>
-                  </div>
+                {/* Radar Chart & Bonds side by side layout */}
+                <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch">
+                  {/* Radar Chart (D3 SVG Pentagonal Grid) */}
+                  <GeneralRadarChart general={displayGeneral} activeBonds={activeBondsList} />
 
-                  {/* Intelligence */}
-                  <div>
-                    <div className="flex justify-between text-[10px] text-artistic-charcoal/90 font-serif mb-0.5">
-                      <span>智力 (奇谋施策)</span>
-                      <span className="font-bold text-blue-800">{displayGeneral.intelligence}</span>
+                  {/* Bonds Detail Column */}
+                  <div className="bg-[#faf5ec] border border-artistic-charcoal/30 p-2.5 flex flex-col justify-between rounded-none font-serif text-left">
+                    <div>
+                      <h5 className="text-[10.5px] font-black text-artistic-crimson border-b border-artistic-charcoal/20 pb-1 mb-1.5 flex items-center gap-1">
+                        <Trophy className="w-3.5 h-3.5" />
+                        宿世麾下羁绊 (Bonds)
+                      </h5>
+                      
+                      {generalBondsList.length > 0 ? (
+                        <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1">
+                          {generalBondsList.map(bond => (
+                            <div key={bond.id} className="p-1.5 bg-[#f5ebd0]/80 border border-amber-800/20 rounded-none text-[9.5px] leading-relaxed">
+                              <div className="font-bold text-amber-950 flex justify-between items-center mb-0.5">
+                                <span>{bond.name.split(' (')[0]}</span>
+                                <span className="bg-red-700 text-white text-[8px] px-1 scale-90">生效中</span>
+                              </div>
+                              <p className="text-stone-700 text-[9px] leading-snug">{bond.description}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-4 text-center">
+                          <span className="text-[18px] opacity-40">🤝</span>
+                          <p className="text-[9.5px] text-stone-500 max-w-[150px] leading-relaxed mt-1 italic">
+                            孤军征战。同时招募渊源英杰（如刘关张、曹操郭嘉、诸葛姜维）可唤醒专属宿命羁绊！
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <div className="w-full bg-artistic-cream h-2 rounded-none border border-artistic-charcoal/35 overflow-hidden">
-                      <div className="bg-blue-800 h-full" style={{ width: `${displayGeneral.intelligence}%` }}></div>
-                    </div>
-                  </div>
 
-                  {/* Leadership */}
-                  <div>
-                    <div className="flex justify-between text-[10px] text-artistic-charcoal/90 font-serif mb-0.5">
-                      <span>统帅 (排兵布阵)</span>
-                      <span className="font-bold text-emerald-800">{displayGeneral.leadership}</span>
-                    </div>
-                    <div className="w-full bg-artistic-cream h-2 rounded-none border border-artistic-charcoal/35 overflow-hidden">
-                      <div className="bg-emerald-800 h-full" style={{ width: `${displayGeneral.leadership}%` }}></div>
-                    </div>
-                  </div>
-
-                  {/* Loyalty / Relation */}
-                  {recruitedSet.has(displayGeneral.id) && (
-                    <div className="flex items-center gap-2 pt-1.5 border-t border-artistic-charcoal/20 mt-1">
-                      <Heart className="w-4 h-4 text-artistic-crimson fill-artistic-crimson" />
-                      <div className="flex-1">
-                        <div className="flex justify-between text-[10px] font-bold text-artistic-ink">
-                          <span>军心忠诚度</span>
-                          <span>{displayGeneral.loyalty} / 100</span>
+                    {generalBondsList.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-dashed border-artistic-charcoal/20 text-[9px] font-bold text-red-850 bg-red-50/50 p-1">
+                        <div>🔥 羁绊额外属性成长加成中:</div>
+                        <div className="grid grid-cols-2 gap-x-1 mt-0.5 text-[8px] font-mono">
+                          {forceBonus > 0 && <div className="text-red-750">・武力 +{forceBonus}</div>}
+                          {intelBonus > 0 && <div className="text-blue-750">・智力 +{intelBonus}</div>}
+                          {leadBonus > 0 && <div className="text-emerald-750">・统帅 +{leadBonus}</div>}
+                          {polBonus > 0 && <div className="text-amber-750">・政治 +{polBonus}</div>}
+                          {virtBonus > 0 && <div className="text-purple-750">・德行 +{virtBonus}</div>}
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
+
+                {/* Core attributes grids with indicators */}
+                <div className="mb-4">
+                  <h4 className="text-xs font-serif font-black text-artistic-crimson mb-2">【幕府武职底案】</h4>
+                  <div className="space-y-2 text-xs">
+                    {/* Force */}
+                    <div>
+                      <div className="flex justify-between text-[10px] text-artistic-charcoal/90 font-serif mb-0.5">
+                        <span>武力 (阵斩斗将)</span>
+                        <span className="font-bold flex items-center gap-1">
+                          {displayGeneral.force} 
+                          {forceBonus > 0 && <span className="text-red-700 text-[9px] font-black">(+{forceBonus} 羁绊)</span>}
+                        </span>
+                      </div>
+                      <div className="w-full bg-artistic-cream h-2 rounded-none border border-artistic-charcoal/35 overflow-hidden">
+                        <div className="bg-artistic-crimson h-full transition-all duration-300" style={{ width: `${Math.min(100, displayGeneral.force + forceBonus)}%` }}></div>
+                      </div>
+                    </div>
+
+                    {/* Intelligence */}
+                    <div>
+                      <div className="flex justify-between text-[10px] text-artistic-charcoal/90 font-serif mb-0.5">
+                        <span>智力 (奇谋施策)</span>
+                        <span className="font-bold flex items-center gap-1">
+                          {displayGeneral.intelligence}
+                          {intelBonus > 0 && <span className="text-blue-800 text-[9px] font-black">(+{intelBonus} 羁绊)</span>}
+                        </span>
+                      </div>
+                      <div className="w-full bg-[#f0f4f8] h-2 rounded-none border border-artistic-charcoal/35 overflow-hidden">
+                        <div className="bg-blue-800 h-full transition-all duration-300" style={{ width: `${Math.min(100, displayGeneral.intelligence + intelBonus)}%` }}></div>
+                      </div>
+                    </div>
+
+                    {/* Leadership */}
+                    <div>
+                      <div className="flex justify-between text-[10px] text-artistic-charcoal/90 font-serif mb-0.5">
+                        <span>统帅 (排兵布阵)</span>
+                        <span className="font-bold flex items-center gap-1">
+                          {displayGeneral.leadership}
+                          {leadBonus > 0 && <span className="text-emerald-800 text-[9px] font-black">(+{leadBonus} 羁绊)</span>}
+                        </span>
+                      </div>
+                      <div className="w-full bg-[#ecf7ed] h-2 rounded-none border border-artistic-charcoal/35 overflow-hidden">
+                        <div className="bg-emerald-800 h-full transition-all duration-300" style={{ width: `${Math.min(100, displayGeneral.leadership + leadBonus)}%` }}></div>
+                      </div>
+                    </div>
+
+                    {/* Politics */}
+                    <div>
+                      <div className="flex justify-between text-[10px] text-artistic-charcoal/90 font-serif mb-0.5">
+                        <span>政治 (修缮吏治)</span>
+                        <span className="font-bold flex items-center gap-1">
+                          {displayGeneral.politics}
+                          {polBonus > 0 && <span className="text-amber-800 text-[9px] font-black">(+{polBonus} 羁绊)</span>}
+                        </span>
+                      </div>
+                      <div className="w-full bg-[#fffcf3] h-2 rounded-none border border-artistic-charcoal/35 overflow-hidden">
+                        <div className="bg-amber-700 h-full transition-all duration-300" style={{ width: `${Math.min(100, displayGeneral.politics + polBonus)}%` }}></div>
+                      </div>
+                    </div>
+
+                    {/* Virtue */}
+                    <div>
+                      <div className="flex justify-between text-[10px] text-artistic-charcoal/90 font-serif mb-0.5">
+                        <span>德行 (亲贤礼下)</span>
+                        <span className="font-bold flex items-center gap-1">
+                          {displayGeneral.virtue}
+                          {virtBonus > 0 && <span className="text-purple-750 text-[9px] font-black">(+{virtBonus} 羁绊)</span>}
+                        </span>
+                      </div>
+                      <div className="w-full bg-[#faf5ff] h-2 rounded-none border border-artistic-charcoal/35 overflow-hidden">
+                        <div className="bg-purple-700 h-full transition-all duration-300" style={{ width: `${Math.min(100, displayGeneral.virtue + virtBonus)}%` }}></div>
+                      </div>
+                    </div>
+
+                    {/* Loyalty / Relation */}
+                    {recruitedSet.has(displayGeneral.id) && (
+                      <div className="flex items-center gap-2 pt-1.5 border-t border-artistic-charcoal/20 mt-1">
+                        <Heart className="w-4 h-4 text-artistic-crimson fill-artistic-crimson" />
+                        <div className="flex-1">
+                          <div className="flex justify-between text-[10px] font-bold text-artistic-ink">
+                            <span>军心忠诚度</span>
+                            <span>{displayGeneral.loyalty} / 100</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
 
               {/* General Special Combat Ruse */}
               <div className="bg-artistic-cream border border-artistic-crimson/30 p-2.5 rounded-none text-xs leading-normal mb-4">

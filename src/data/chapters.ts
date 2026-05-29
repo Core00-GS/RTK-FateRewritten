@@ -528,6 +528,7 @@ export const GAME_SCENES: Record<string, StoryScene> = {
     chapterId: 'c1',
     title: '力伏红黑，英雄大相惜',
     year: 184,
+    cgImage: 'taoyuan_oath.jpg',
     narration: '关羽、张飞同时收回青紫拳头，心骇折服望着你，极赞阁下神勇。你在当街展现惊天战战能。一旁的刘玄德看入眼中，激荡起伏。四豪杰大誓相遇。张飞拍手大骂叫快，大步邀你们同携手赶赴自家桃花后庄！',
     historicalFact: '演义上只刘备拉开二人，现由你施神勇平伏二豪。在幽州游侠圈，阁下大名盖世。',
     options: [
@@ -640,6 +641,133 @@ export const GAME_SCENES: Record<string, StoryScene> = {
         effect: {
           statChanges: { leadership: 5, troops: -600, gold: 100, prestige: 30 },
           customLog: '大军结成圆阵，稳扎稳打。虽全歼乱兵，但义军死伤颇多，所幸获得部分降兵充实行伍。'
+        },
+        nextSceneId: 'c2_start'
+      }
+    ]
+  },
+  
+  'c1_1': {
+    id: 'c1_1',
+    chapterId: 'c1',
+    title: '卧牛山黄巾骤现 · 智计排兵对阵',
+    year: 184,
+    cgImage: 'pei_yuanshao_battle.jpg',
+    narration: '四英宿愿既定，正欲起兵。探子飞马急报：幽州边境、卧牛山一带，有黄巾军骁将裴元绍，率领两团啸聚山林的乱民贼寇三千余众大肆侵犯乡村，扼守涿郡商道。彼虽无章，但地势险要，草木皆兵。刘备抚起配剑叹道：“吾军方建，正可仗赖诸君神威犁平此贼，以安人心！”军情孔急，排兵布阵就在瞬息之间：',
+    historicalFact: '裴元绍是三国演义中在卧牛山盘踞的黄巾偏将，后意图盗取赵云的照夜玉狮子马被赵云刺死。本传中你将在战线初期与之交锋。',
+    options: [
+      {
+        id: 'c1_pei_opt1',
+        text: '【锥形猛打阵】以骁勇张飞、关羽为前后双锋，摆出锥形进攻阵，单刀直入取裴元绍项上首级！',
+        requirement: { attribute: 'force', minVal: 65 },
+        effect: {
+          statChanges: { force: 2, leadership: 1, troops: -150 },
+          customLog: '你命三军立起大漠惊牛锥形冲击阵。张飞狂叫跃马当先，关羽从侧翼突击掩杀。破阵同时，义勇军冲锋肉搏折损了150名勇士，裴元绍首尾难顾，大溃而退！'
+        },
+        nextSceneId: 'c1_pei_force'
+      },
+      {
+        id: 'c1_pei_opt2',
+        text: '【圆衡诱敌计】玩家设假虚营为诱饵，退入山谷两翼布下口袋，计捕野性悍贼！',
+        requirement: { attribute: 'intelligence', minVal: 65 },
+        effect: {
+          statChanges: { intelligence: 3, virtue: 1 },
+          customLog: '你施计让疑兵徐徐败退，将贪功的裴元绍诱至狭谷要塞，两厢齐鸣金火抛石，逼使乱兵束手无策！'
+        },
+        nextSceneId: 'c1_pei_intel'
+      }
+    ]
+  },
+
+  'c1_pei_force': {
+    id: 'c1_pei_force',
+    chapterId: 'c1',
+    title: '卧牛山大捷 · 俘获乱民群丑',
+    year: 184,
+    narration: '直撞锋芒，三军用命！只听交合一阵中一声刀雷炸响，关云长手拍青龙 Crescent 大刀凌空斩下，一合震倒裴元绍。裴贼落荒在泥地翻身，被张飞铁矛当即拷擒！部众黄巾眼见渠魁被擒，吓得魂飞魄散，三千贼兵丢盔弃甲，当场跪伏四百余名。然而正面尖刀拼刺下，我军义勇之士精锐受创，遭遇了小规模战损！',
+    historicalFact: '演义中在地方割据角逐里，战斗不可避免伴随着死伤。如何处置俘虏，决定一个势力的长治与威德高下。',
+    options: [
+      {
+        id: 'c1_pei_fc_opt1',
+        text: '【宏恩招降】好生规劝，将其部众黄巾有志者收编如大营，折损部分黄金，大饱兵卒。',
+        effect: {
+          statChanges: { troops: 400, gold: -80, virtue: 5, popularity: 10 },
+          customLog: '你开仓赏粮，对这些黄巾难民好言相和。四百余降卒感激涕零，甘愿解散裹头，全数编入你的中营义勇行伍，大扩阵仗！'
+        },
+        nextSceneId: 'c1_pei_ending'
+      },
+      {
+        id: 'c1_pei_fc_opt2',
+        text: '【德泽遣还】发放些许铜子，勒令其改邪归正还乡开垦荒野，立博善名。',
+        effect: {
+          statChanges: { virtue: 18, popularity: 20, prestige: 50, gold: -50 },
+          customLog: '你不愿强制服军役，向降卒每人发放少量归乡米粮，遣散其还乡耕种。方圆百十里的平民百姓皆传颂你大恩大德。'
+        },
+        nextSceneId: 'c1_pei_ending'
+      },
+      {
+        id: 'c1_pei_fc_opt3',
+        text: '【雷霆正法】统统斩首示众！大汉纲纪岂容流寇妖道玷污，严威整振！',
+        effect: {
+          statChanges: { force: 5, politics: 5, prestige: 100, virtue: -20, popularity: -15 },
+          customLog: '你挥下佩刀，在涿郡菜市口一字正法，重惩汉贼。塞外流寇土匪听闻你冷血之名，皆慑人心寒。'
+        },
+        nextSceneId: 'c1_pei_ending'
+      }
+    ]
+  },
+
+  'c1_pei_intel': {
+    id: 'c1_pei_intel',
+    chapterId: 'c1',
+    title: '妙定伏局 · 无战擒得降众',
+    year: 184,
+    narration: '天赐奇谋！裴元绍中计被飞石大火堵在谷内，左冲右突无路。张翼德在断壁上扯雷暴吼，关云长引精骑高树重幡。裴元绍下马伏拜叩首：“公等皆乃汉室神将，罪将情愿率众归降，再不敢劫庄！”全军以极零成本困伏敌手，不仅无一兵一卒伤折，更完美降服三千之众，获得四百精干战俘！',
+    historicalFact: '上兵伐谋，其次伐交，最下攻城。用智谋兵略将乱民兵不血刃解下武装，乃兵学最高一环。',
+    options: [
+      {
+        id: 'c1_pei_it_opt1',
+        text: '【宽大收纳】施予粮饷，将这些不伤分毫的精兵降卒扩充为中营义勇兵。',
+        effect: {
+          statChanges: { troops: 400, gold: -60, virtue: 5, popularity: 10 },
+          customLog: '这些青壮未遭战创，体力丰足。收纳编入行伍后，你的长戟军仪容大振！'
+        },
+        nextSceneId: 'c1_pei_ending'
+      },
+      {
+        id: 'c1_pei_it_opt2',
+        text: '【仁爱开释】令其解甲归田。宣颂汉朝之恩，增加主公的名士德望。',
+        effect: {
+          statChanges: { virtue: 15, popularity: 15, prestige: 40, gold: -40 },
+          customLog: '裴元绍一众抱拳痛哭，千谢万谢。散为平民还家开荒，大大改善了你属城郡的户籍安泰。'
+        },
+        nextSceneId: 'c1_pei_ending'
+      },
+      {
+        id: 'c1_pei_it_opt3',
+        text: '【以儆效尤】乱寇终为寇。为了防止降而复叛，全数发往塞外修城。',
+        effect: {
+          statChanges: { politics: 10, prestige: 80, popularity: -10 },
+          customLog: '将这些囚俘戴罪羁押，发往附近防壁城塞强筑防线。大大增加了地方官民的畏惧敬肃。'
+        },
+        nextSceneId: 'c1_pei_ending'
+      }
+    ]
+  },
+
+  'c1_pei_ending': {
+    id: 'c1_pei_ending',
+    chapterId: 'c1',
+    title: '涿郡威名大震 · 奠定争霸宏图',
+    year: 184,
+    narration: '卧牛山一战定乾坤，裴元绍心悦诚服。刘关张等兄弟携你手慷慨高歌，举城同庆。幽州刺史、太守上奏龙廷推荐，你已被任命为讨贼别部先锋，大军开辟，兵指神州广茂中原。汉家天空里，红日将升，而主公开拔，迈入豪强割据的中原浩渺！',
+    historicalFact: '首战首捷，主公在义军之中建立了难以企及的军事统御威烈。黄巾风暴卷向北海，匈奴雁门犯关！下一幕由此开启。',
+    options: [
+      {
+        id: 'c1_pei_end_opt1',
+        text: '【大业东征】挥旗号令，率关张赵云匈奴雁门与北海并进！',
+        effect: {
+          statChanges: { prestige: 50, year: 1 }
         },
         nextSceneId: 'c2_start'
       }

@@ -102,6 +102,7 @@ export interface StoryScene {
   historicalFact: string;            // 历史原本的真实走向（给玩家对比用）
   options: StoryOption[];            // 可选方案
   backgroundImage?: string;          // 可选背景图
+  cgImage?: string;                  // CG图片名称 (触发时自动播放带有CG名字的白色窗口，可点击关闭)
 }
 
 // 游戏主线章节
