@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Noto+Serif+SC:wght@500;700;900&family=Ma+Shan+Zheng&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Georgia", "Noto Serif SC", serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --font-calligraphy: "Ma Shan Zheng", cursive, serif;
+
+  --color-artistic-bg: #f2e6d0;
+  --color-artistic-ink: #2a2319;
+  --color-artistic-charcoal: #3d3228;
+  --color-artistic-crimson: #8b0000;
+  --color-artistic-cream: #ede0c5;
+}
+
+@layer utilities {
+  /* Scrollbar for calligraphy panels */
+  .scrollbar-ink {
+    scrollbar-width: thin;
+    scrollbar-color: #3d3228 #f2e6d0;
+  }
+}
+
+/* Custom radial parchment texture from the design template */
+.bg-artistic-canvas {
+  background-color: #f2e6d0;
+  background-image: radial-gradient(circle at center, transparent 0%, rgba(0, 0, 0, 0.05) 100%);
+}
+
+/* Extra decorative textures */
+.ink-paper-texture {
+  background-color: #ede0c5;
+  background-image: radial-gradient(#3d3228 0.5px, transparent 0.5px);
+  background-size: 16px 16px;
+}
+
+/* Page transitions */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleUp {
+  from { transform: scale(0.96); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-up {
+  animation: scaleUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-spin-slow {
+  animation: spin 16s linear infinite;
+}

@@ -1,0 +1,8 @@
+{
+  "name": " 三国逆天改命：文字战略RPG",
+  "description": "一款以三国题材为背景的高自由度文字策略游戏。从公元180年黄巾之乱开始至三国归一，玩家可结义刘关张或自立门户、招兵买马、北击匈奴、平定四海、改变历史。包含庞大的主线章节、丰富的支线任务、深度社交招募系统和宏大的互动地图系统。",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
