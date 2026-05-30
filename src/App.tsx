@@ -16,6 +16,7 @@ import QuestList from './components/QuestList';
 import FactionDiplomacy from './components/FactionDiplomacy';
 import RandomEventsTab from './components/RandomEventsTab';
 import CivilianModsTab from './components/CivilianModsTab';
+import TrainingTab from './components/TrainingTab';
 import { sfx } from './utils/audio';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { 
@@ -25,11 +26,62 @@ import {
 } from 'lucide-react';
 
 const SAVE_KEY = 'three_kingdoms_retro_alt_save_v2';
+const INITIAL_GENERAL_DEFAULTS = JSON.parse(JSON.stringify(INITIAL_GENERAL_POOL));
+
+const calculateEndingEvaluation = (stats: PlayerStats, recruitedCount: number, sceneId: string) => {
+  let baseScore = 20;
+  if (sceneId === 'ending_emperor') baseScore = 90;
+  else if (sceneId === 'ending_loyalist') baseScore = 80;
+  else if (sceneId === 'ending_historic') baseScore = 50;
+  else if (sceneId === 'ending_defeat') baseScore = 25;
+
+  const devianceBonus = stats.deviance * 0.5; // max 50 points
+  const generalsBonus = recruitedCount * 5;    // max 35 points
+  const prestigeBonus = Math.min(25, stats.prestige / 30); // max 25 points
+  const goldBonus = Math.min(15, stats.gold / 100);       // max 15 points
+  
+  const totalScore = baseScore + devianceBonus + generalsBonus + prestigeBonus + goldBonus;
+
+  let grade = 'C';
+  if (totalScore >= 115) grade = 'SSS';
+  else if (totalScore >= 95) grade = 'SS';
+  else if (totalScore >= 80) grade = 'S';
+  else if (totalScore >= 65) grade = 'A';
+  else if (totalScore >= 45) grade = 'B';
+
+  let feedback = '治世之能员，乱世之柴扉。苟活于草莽之中，功绩廖廖。';
+  if (grade === 'SSS') {
+    feedback = '昭雪乾坤，逆天改命！公手执纲纪，颠覆编年，建立不朽之万世社稷，功至极境，千古无双！';
+  } else if (grade === 'SS') {
+    feedback = '豪雄逐鹿，鼎立一方。公筹策百出，广纳英豪，鼎足割据，功高垂世。';
+  } else if (grade === 'S') {
+    feedback = '名满天下，兴邦卫汉。虽有细微星运局限，然不失为一代贤君明主。';
+  } else if (grade === 'A') {
+    feedback = '勒马安澜，安邦兴治。保境安民数十载，无愧当代英雄。';
+  } else if (grade === 'B') {
+    feedback = '庸中佼佼，草创大业。终因运数难脱、宿命浅薄，消逝于历史江河之中。';
+  }
+
+  return { score: totalScore, grade, feedback };
+};
 
 export default function App() {
   // --- Game Session State ---
-  const [gameState, setGameState] = useState<'INTRO' | 'STORY' | 'MAP' | 'ROSTER' | 'GOV' | 'DIPLOMACY' | 'RANDOM_EVENTS' | 'CIVILIAN_MODS' | 'SIDE_QUESTS' | 'ARCHIVE' | 'ENDING'>('INTRO');
+  const [gameState, setGameState] = useState<'MAIN_MENU' | 'INTRO' | 'STORY' | 'MAP' | 'ROSTER' | 'GOV' | 'DIPLOMACY' | 'RANDOM_EVENTS' | 'CIVILIAN_MODS' | 'SIDE_QUESTS' | 'ARCHIVE' | 'ENDING' | 'TRAINING'>('MAIN_MENU');
   
+  // --- Multi-playthrough (Weeks) SSS Bonus ---
+  const [sssBonusPoints, setSssBonusPoints] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('three_kingdoms_sss_bonus_points');
+      return saved ? parseInt(saved, 10) : 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  // --- Campaign Start Talent Selection ---
+  const [selectedTalent, setSelectedTalent] = useState<'none' | 'renyi' | 'baonve'>('none');
+
   // --- Diplomacy Relations State ---
   const [diplomacyRelations, setDiplomacyRelations] = useState<Record<FactionId, number>>({
     PLAYER: 100,
@@ -73,7 +125,15 @@ export default function App() {
   });
 
   // --- Character Builder Points ---
-  const [creationPoints, setCreationPoints] = useState<number>(30);
+  const [creationPoints, setCreationPoints] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('three_kingdoms_sss_bonus_points');
+      const bonus = saved ? parseInt(saved, 10) : 0;
+      return 30 + bonus;
+    } catch {
+      return 30;
+    }
+  });
   const [builderStats, setBuilderStats] = useState({
     force: 60,
     intelligence: 60,
@@ -82,6 +142,9 @@ export default function App() {
     virtue: 60,
   });
 
+  // --- Playthrough unique run identification ---
+  const [runId, setRunId] = useState<string>(() => 'run_' + Date.now());
+
   // --- Core Lists ---
   const [recruitedGenerals, setRecruitedGenerals] = useState<string[]>([]);
   const [completedQuests, setCompletedQuests] = useState<string[]>([]);
@@ -89,6 +152,7 @@ export default function App() {
   const [regions, setRegions] = useState<Region[]>(INITIAL_REGIONS);
   const [currentSceneId, setCurrentSceneId] = useState<string>('c1_0');
   const [currentCG, setCurrentCG] = useState<string | null>(null);
+  const [autoSaveActive, setAutoSaveActive] = useState<boolean>(false);
 
   useEffect(() => {
     const scene = GAME_SCENES[currentSceneId];
@@ -124,6 +188,31 @@ export default function App() {
   ]);
   const [battleLogFilter, setBattleLogFilter] = useState<'all' | 'action' | 'casualty' | 'gain' | 'random_event'>('all');
 
+  // --- Battle Log Impact Animation State ---
+  const [battleLogAnim, setBattleLogAnim] = useState<'none' | 'shake' | 'flash'>('none');
+
+  const prevLogsLength = useRef<number>(1);
+  useEffect(() => {
+    if (battleLogs && battleLogs.length > prevLogsLength.current) {
+      const latestLog = battleLogs[0];
+      if (latestLog && latestLog.id !== 'init_log') {
+        if (latestLog.type === 'casualty') {
+          setBattleLogAnim('shake');
+          const t = setTimeout(() => setBattleLogAnim('none'), 400);
+          return () => clearTimeout(t);
+        } else if (latestLog.type === 'gain') {
+          setBattleLogAnim('flash');
+          const t = setTimeout(() => setBattleLogAnim('none'), 500);
+          return () => clearTimeout(t);
+        }
+      }
+    }
+    prevLogsLength.current = battleLogs ? battleLogs.length : 1;
+  }, [battleLogs]);
+
+  // --- Story Decision Countdown Timer ---
+  const [storyTimer, setStoryTimer] = useState<number | null>(null);
+
   // --- Decision Outcomes Popup ---
   const [lastOutcome, setLastOutcome] = useState<{
     optionText: string;
@@ -149,7 +238,24 @@ export default function App() {
   } | null>(null);
 
   // --- Global Audio Settings ---
-  const [soundOn, setSoundOn] = useState<boolean>(false);
+  const [soundOn, setSoundOn] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('tk_sound_pref');
+      return saved === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Synchronize persisted sound settings with sfx engine and localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('tk_sound_pref', soundOn ? 'true' : 'false');
+    } catch (e) {
+      console.warn("Could not save sound settings:", e);
+    }
+    sfx.setMute(!soundOn);
+  }, [soundOn]);
 
   // --- New features state ---
   const [showTutorialModal, setShowTutorialModal] = useState<boolean>(false);
@@ -282,7 +388,8 @@ export default function App() {
       exploredRegions,
       relations: diplomacyRelations,
       questsList,
-      lastCheckedDate
+      lastCheckedDate,
+      runId
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     showToast("【开库奏报】军情行纪已妥善封存入阁，可随时在主屏幕载入！");
@@ -306,6 +413,25 @@ export default function App() {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
+
+  // --- 5-minute automated local storage save ---
+  useEffect(() => {
+    if (gameState === 'INTRO' || gameState === 'MAIN_MENU') return;
+    const interval = setInterval(() => {
+      if (gameState !== 'INTRO' && gameState !== 'MAIN_MENU') {
+        saveGameRef.current();
+        // Toast and icon animation trigger
+        showToast("【太史筒册】天命昭雪行纪已由史官自动誊抄毕，封存存档。");
+        setAutoSaveActive(true);
+        const timer = setTimeout(() => {
+          setAutoSaveActive(false);
+        }, 5000);
+        return () => clearTimeout(timer);
+      }
+    }, 300000); // 300,000 ms = 5 minutes
+
+    return () => clearInterval(interval);
+  }, [gameState]);
 
   const loadGame = () => {
     const cached = localStorage.getItem(SAVE_KEY);
@@ -336,6 +462,11 @@ export default function App() {
       if (data.lastCheckedDate) {
         setLastCheckedDate(data.lastCheckedDate);
       }
+      if (data.runId) {
+        setRunId(data.runId);
+      } else {
+        setRunId('run_' + Date.now());
+      }
       showToast("【旧案调阅】成功寻回原定乾坤行纪。主公，还请再度发敕！");
     } catch (e) {
       showToast("读取大业案底时发生绌，档案可能有所污损。");
@@ -344,11 +475,22 @@ export default function App() {
 
   const clearSave = () => {
     setConfirmBox({
-      message: "确定要烧毁在朝所有履历，彻底归野遁入虚无吗？此行将洗去所有大业细节。",
+      message: "确定要参悟天理，重置大业重开一世吗？（多周目 SSS 传承加成将予以保留）",
       onConfirm: () => {
         localStorage.removeItem(SAVE_KEY);
+        
+        // Load sssBonusPoints
+        let bonus = 0;
+        try {
+          const saved = localStorage.getItem('three_kingdoms_sss_bonus_points');
+          bonus = saved ? parseInt(saved, 10) : 0;
+        } catch {}
+        setSssBonusPoints(bonus);
+        setCreationPoints(30 + bonus);
+        setSelectedTalent('none');
+
         // Reset State
-        setGameState('INTRO');
+        setGameState('MAIN_MENU');
         setPlayerStats({
           name: '',
           courtesyName: '',
@@ -368,7 +510,6 @@ export default function App() {
           difficulty: 'normal',
           deviance: 0,
         });
-        setCreationPoints(30);
         setBuilderStats({
           force: 60,
           intelligence: 60,
@@ -379,7 +520,8 @@ export default function App() {
         setRecruitedGenerals([]);
         setCompletedQuests([]);
         setActiveQuests([]);
-        setRegions(INITIAL_REGIONS);
+        setRegions(JSON.parse(JSON.stringify(INITIAL_REGIONS)));
+        setQuestsList(JSON.parse(JSON.stringify(SIDE_QUESTS_POOL)));
         setDiplomacyRelations({
           PLAYER: 100,
           HAN: 30,
@@ -397,7 +539,17 @@ export default function App() {
         setTaxCooldown(false);
         setPlayerLocation('zhuojun');
         setExploredRegions(['zhuojun']);
-        showToast("📿 已烧毁在朝履历，尘埃落定归于江湖。");
+
+        // Restore default state of all generals to prevent status leak
+        if (INITIAL_GENERAL_DEFAULTS) {
+          Object.keys(INITIAL_GENERAL_DEFAULTS).forEach(key => {
+            if (INITIAL_GENERAL_POOL[key] && INITIAL_GENERAL_DEFAULTS[key]) {
+              Object.assign(INITIAL_GENERAL_POOL[key], JSON.parse(JSON.stringify(INITIAL_GENERAL_DEFAULTS[key])));
+            }
+          });
+        }
+
+        showToast("📿 天机重绘，大业尘落主菜单，传承点数已就位！");
       }
     });
   };
@@ -421,31 +573,80 @@ export default function App() {
     }
 
     let startingGold = 500;
-    let startingTroops = 0;
+    let startingTroops = 1200; // Normal starting troops as described in buttons
 
     if (playerStats.difficulty === 'easy') {
       startingGold = 1000;
+      startingTroops = 2000;
     } else if (playerStats.difficulty === 'hard') {
       startingGold = 250;
+      startingTroops = 750;
+    }
+
+    // Apply Talent Adjustments!
+    let talentVirtueBonus = 0;
+    let talentGoldBonus = 0;
+    let talentForceBonus = 0;
+    let talentPrestigeBonus = 0;
+    let talentTroopsBonus = 0;
+
+    if (selectedTalent === 'renyi') {
+      talentVirtueBonus = 15;
+      talentPrestigeBonus = 50;
+      talentTroopsBonus = 150;
+    } else if (selectedTalent === 'baonve') {
+      talentVirtueBonus = -15; // "暴虐无道-15"
+      talentGoldBonus = 500;
+      talentForceBonus = 15;
     }
     
     const initialStats: PlayerStats = {
       ...playerStats,
-      force: builderStats.force,
+      force: builderStats.force + talentForceBonus,
       intelligence: builderStats.intelligence,
       leadership: builderStats.leadership,
       politics: builderStats.politics,
-      virtue: builderStats.virtue,
-      troops: startingTroops,
-      gold: startingGold,
-      prestige: 0,
-      popularity: 100,
+      virtue: Math.max(0, builderStats.virtue + talentVirtueBonus),
+      troops: startingTroops + talentTroopsBonus,
+      gold: startingGold + talentGoldBonus,
+      prestige: talentPrestigeBonus,
+      popularity: selectedTalent === 'renyi' ? 120 : (selectedTalent === 'baonve' ? 60 : 100),
       year: 177,
       month: 1,
       day: 1,
       deviance: 0,
       title: '乡村义士首'
     };
+
+    // Deep reset components to completely clear previous runs leftovers
+    setRegions(JSON.parse(JSON.stringify(INITIAL_REGIONS)));
+    setQuestsList(JSON.parse(JSON.stringify(SIDE_QUESTS_POOL)));
+    setRecruitedGenerals([]);
+    setCompletedQuests([]);
+    setActiveQuests([]);
+    setTaxCooldown(false);
+    setPlayerLocation('zhuojun');
+    setExploredRegions(['zhuojun']);
+    setDiplomacyRelations({
+      PLAYER: 100,
+      HAN: 30,
+      CAOCAO: 0,
+      LIUBEI: 20,
+      SUNQUAN: 10,
+      YELLOW_TURBAN: -90,
+      DONGZHUO: -70,
+      XIONGNU: -40,
+      JIN: 0
+    });
+
+    // Reset general stats
+    if (INITIAL_GENERAL_DEFAULTS) {
+      Object.keys(INITIAL_GENERAL_DEFAULTS).forEach(key => {
+        if (INITIAL_GENERAL_POOL[key] && INITIAL_GENERAL_DEFAULTS[key]) {
+          Object.assign(INITIAL_GENERAL_POOL[key], JSON.parse(JSON.stringify(INITIAL_GENERAL_DEFAULTS[key])));
+        }
+      });
+    }
 
     setPlayerStats(initialStats);
     setCurrentSceneId('c1_0');
@@ -458,7 +659,9 @@ export default function App() {
       id: `battle_init_${Date.now()}`,
       chapterId: 'c1',
       timestamp: startingDateStr,
-      message: `🚩 乱世风雨急，主公 ${initialStats.name}（字 ${initialStats.courtesyName}）在涿郡结发募军，开启匡扶天下之路！【开局难度: ${
+      message: `🚩 乱世风雨急，主公 ${initialStats.name}（字 ${initialStats.courtesyName}）在涿郡结发募军，开启匡扶天下之路！【天赋: ${
+        selectedTalent === 'renyi' ? '仁义之君 (德行+15, 起始威名+50, 起始额外+150精兵)' : selectedTalent === 'baonve' ? '暴虐无道 (德行-15, 起始劫掠黄金+500, 起始武力+15)' : '凡人俗子 (无)'
+      }】 【开局难度: ${
         playerStats.difficulty === 'easy' ? '割据一方(简单)' : playerStats.difficulty === 'hard' ? '白手起兵(困难)' : '群雄并起(普通)'
       }】`,
       type: 'action' as const
@@ -808,6 +1011,105 @@ export default function App() {
     });
   };
 
+  // --- Auto-Select Worst Option when countdown reaches zero ---
+  const handleAutoSelectWorstOption = () => {
+    const activeScene = GAME_SCENES[currentSceneId];
+    if (!activeScene || !activeScene.options || activeScene.options.length === 0) return;
+
+    let worstOption = activeScene.options[0];
+    let worstScore = Infinity;
+
+    activeScene.options.forEach(option => {
+      let score = 0;
+      if (option.effect && option.effect.statChanges) {
+        const sc = option.effect.statChanges;
+        score += (sc.troops || 0) * 2; // heavily weight troops
+        score += (sc.gold || 0);
+        score += (sc.force || 0) * 10;
+        score += (sc.intelligence || 0) * 10;
+        score += (sc.prestige || 0) * 5;
+        score += (sc.virtue || 0) * 5;
+      }
+      if (score < worstScore) {
+        worstScore = score;
+        worstOption = option;
+      }
+    });
+
+    showToast(`⏰ 决断余息竭！默认自动行最坏之策：【${worstOption.text}】！`);
+    sfx.playDrum();
+    handleOptionSelect(worstOption);
+    setStoryTimer(null);
+  };
+
+  // --- Countdown timer effect logic ---
+  useEffect(() => {
+    let interval: any = null;
+    const activeScene = GAME_SCENES[currentSceneId];
+    const hasOptions = activeScene && activeScene.options && activeScene.options.length > 0;
+
+    if (gameState === 'STORY' && hasOptions && !lastOutcome) {
+      if (storyTimer === null) {
+        setStoryTimer(25); // 25 seconds duration
+      } else if (storyTimer > 0) {
+        interval = setInterval(() => {
+          setStoryTimer(prev => (prev !== null ? prev - 1 : null));
+        }, 1000);
+      } else if (storyTimer === 0) {
+        handleAutoSelectWorstOption();
+      }
+    } else {
+      if (storyTimer !== null) {
+        setStoryTimer(null);
+      }
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [gameState, currentSceneId, lastOutcome, storyTimer]);
+
+  // --- Trigger Game Over if troops <= 0 while playing ---
+  useEffect(() => {
+    if (gameState !== 'INTRO' && gameState !== 'MAIN_MENU' && gameState !== 'ENDING' && playerStats && playerStats.troops <= 0) {
+      sfx.playFanfare(false);
+      setCurrentSceneId('ending_defeat');
+      setGameState('ENDING');
+      showToast("🥀 兵员消耗殆尽，军威尽失！主公沦为枪下劫掠之骨。");
+    }
+  }, [playerStats.troops, gameState]);
+
+  // --- Award SSS multi-playthrough reward on reaching ENDING state ---
+  useEffect(() => {
+    if (gameState === 'ENDING') {
+      const scene = GAME_SCENES[currentSceneId] || GAME_SCENES['c1_0'];
+      const endingEvaluation = calculateEndingEvaluation(playerStats, recruitedGenerals.length, scene.id);
+      if (endingEvaluation.grade === 'SSS') {
+        try {
+          const rewardedRuns = JSON.parse(localStorage.getItem('three_kingdoms_rewarded_runs') || '[]');
+          if (!rewardedRuns.includes(runId)) {
+            // Award SSS bonus
+            const savedBonus = localStorage.getItem('three_kingdoms_sss_bonus_points');
+            const currentBonus = savedBonus ? parseInt(savedBonus, 10) : 0;
+            const newBonus = currentBonus + 18;
+            localStorage.setItem('three_kingdoms_sss_bonus_points', newBonus.toString());
+            
+            // Save runId to rewardedRuns
+            rewardedRuns.push(runId);
+            localStorage.setItem('three_kingdoms_rewarded_runs', JSON.stringify(rewardedRuns));
+            
+            setSssBonusPoints(newBonus);
+            setCreationPoints(30 + newBonus);
+            
+            showToast("🏆 【薪火相传功德满】大业评定达 SSS 盖世境界！天理已记录，下世起点多获 +18 底子属性点！");
+          }
+        } catch (e) {
+          console.error("Failed to parse SSS reward progression", e);
+        }
+      }
+    }
+  }, [gameState, currentSceneId, runId, playerStats, recruitedGenerals]);
+
   const handleProceedOutcome = () => {
     if (!lastOutcome) return;
     sfx.playClick();
@@ -1136,6 +1438,13 @@ export default function App() {
               國
             </span>
             <span>志 · 逆境昭雪</span>
+            {/* Visual confirmation icon animation for auto-save */}
+            <span className={`inline-flex items-center ml-2.5 text-[10px] md:text-xs font-serif font-bold text-emerald-800 bg-emerald-500/15 border border-emerald-600 px-2 py-0.5 rounded-none transition-all duration-500 ${
+              autoSaveActive ? 'opacity-100 scale-100 animate-pulse ring-1 ring-emerald-500' : 'opacity-0 scale-95 pointer-events-none'
+            }`}>
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-700 mr-1 animate-[spin_2.5s_linear_infinite]" />
+              <span>秘录封箱成功 (Auto-Saved)</span>
+            </span>
           </h1>
           <p className="text-[10px] md:text-xs uppercase tracking-widest opacity-70 text-artistic-ink/80 font-mono">
             Chronicles of the Three Kingdoms: Altered Destiny
@@ -1177,17 +1486,112 @@ export default function App() {
 
           <div className="text-right">
             <div className="text-sm md:text-2xl font-bold mb-1 font-serif text-artistic-charcoal">
-              {gameState === 'INTRO' ? '汉光和元年' : `公元 ${playerStats.year}年${playerStats.month}月${playerStats.day}日`}
+              {(gameState === 'INTRO' || gameState === 'MAIN_MENU') ? '汉光和元年' : `公元 ${playerStats.year}年${playerStats.month}月${playerStats.day}日`}
             </div>
             <div className="text-[10px] md:text-xs tracking-widest bg-artistic-charcoal text-artistic-bg px-2.5 py-1 inline-block select-none font-mono">
-              {gameState === 'INTRO' ? '西元 177 年 · 涿郡' : `${activeChapter.num} · ${regions.find(r => r.id === playerLocation)?.name || '涿郡'}`}
+              {(gameState === 'INTRO' || gameState === 'MAIN_MENU') ? '西元 177 年 · 涿郡' : `${activeChapter.num} · ${regions.find(r => r.id === playerLocation)?.name || '涿郡'}`}
             </div>
           </div>
         </div>
       </div>
 
       {/* --- Main Game Core wrapper grid --- */}
-      {gameState === 'INTRO' ? (
+      {gameState === 'MAIN_MENU' ? (
+        <div id="main-menu-container" className="flex-1 flex items-center justify-center p-4 py-12 relative z-10 animate-fade-in animate-scale-up">
+          <div className="bg-[#ebd9bc] border-[6px] border-double border-artistic-charcoal rounded-none max-w-xl w-full p-8 md:p-12 shadow-2xl relative text-center">
+            <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(#3d3228_1.5px,transparent_1.5px)] [background-size:24px_24px]"></div>
+            
+            {/* Main Menu Title */}
+            <div className="pb-8 mb-8 border-b-2 border-artistic-charcoal/40 relative">
+              <span className="text-[10px] bg-artistic-crimson text-artistic-bg font-mono font-bold px-3 py-1 uppercase tracking-widest block mx-auto max-w-max mb-3 animate-pulse">
+                ★ 独辟异章 · 逆天而行 ★
+              </span>
+              <h1 className="font-calligraphy text-5xl md:text-6xl text-artistic-crimson font-black tracking-wide leading-tight" style={{ textShadow: '2px 2px 0px rgba(0,0,0,0.15)' }}>
+                三国逆天改命录
+              </h1>
+              <p className="text-xs text-stone-700 font-serif mt-3 italic tracking-widest font-bold">
+                —— 重写历史编年 · 宏大文字战略 RPG ——
+              </p>
+            </div>
+
+            {/* Menu Buttons Grid */}
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={() => {
+                  sfx.playClick();
+                  // Reset talent and builder stats to standard if starting new
+                  setSelectedTalent('none');
+                  setGameState('INTRO');
+                }}
+                className="w-full bg-artistic-charcoal hover:bg-artistic-crimson text-artistic-bg py-4 px-6 rounded-none font-serif font-black text-sm tracking-widest transition-all duration-300 shadow-md border-2 border-transparent hover:border-artistic-bg flex items-center justify-center gap-3 cursor-pointer group"
+              >
+                <span className="w-5 h-5 border border-artistic-bg flex items-center justify-center font-bold text-xs shrink-0 bg-transparent group-hover:border-[#ede0c5]">
+                  甲
+                </span>
+                <span>🎬 开启故事新篇 (故事模式)</span>
+              </button>
+
+              {localStorage.getItem(SAVE_KEY) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playClick();
+                    loadGame();
+                  }}
+                  className="w-full bg-artistic-cream border-2 border-artistic-charcoal hover:bg-artistic-charcoal hover:text-artistic-bg text-artistic-charcoal py-4 px-6 rounded-none font-serif font-black text-sm tracking-widest transition-all duration-300 shadow-md flex items-center justify-center gap-3 cursor-pointer"
+                >
+                  📖 班师恢复大业 (继续昨日)
+                </button>
+              )}
+
+              {/* Multi-run inheritance display */}
+              <div className="bg-artistic-bg border border-artistic-charcoal/20 p-4 rounded-none text-left font-serif">
+                <h4 className="font-black text-xs text-artistic-charcoal border-b border-artistic-charcoal/10 pb-1 mb-2 flex justify-between items-center">
+                  <span>🏅 薪火相传 · 天理传承档案</span>
+                  {sssBonusPoints > 0 && (
+                    <span className="text-[10px] text-amber-700 font-black animate-pulse">宿命大觉醒 ★</span>
+                  )}
+                </h4>
+                <div className="flex justify-between items-center text-xs text-stone-800">
+                  <span>已累积多周目 SSS 评价加成：</span>
+                  <span className="font-mono text-sm font-black text-artistic-crimson bg-[#ede0c5] px-2 py-0.5 border border-dashed border-artistic-crimson/30">
+                    +{sssBonusPoints} 底子点数
+                  </span>
+                </div>
+                <p className="text-[10px] text-stone-500 mt-2 leading-relaxed italic">
+                  每次完结结算达成 【SSS】 评价即可在下世起点获额外 <span className="text-artistic-crimson font-bold">+18</span> 底子点数！(可重复多周目累加，生生不灭)
+                </p>
+                
+                {sssBonusPoints > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmBox({
+                        message: "确定要洗去在野累积的所有多周目 SSS 天赋加成吗？此操作不可逆，会洗白回到初始 30 属性点限制。",
+                        onConfirm: () => {
+                          localStorage.removeItem('three_kingdoms_sss_bonus_points');
+                          setSssBonusPoints(0);
+                          setCreationPoints(30);
+                          showToast("📿 已洗去天道造化，大业归零尘土。");
+                        }
+                      });
+                    }}
+                    className="mt-3 text-[9px] font-sans text-stone-500 hover:text-artistic-crimson hover:underline bg-transparent border-0 cursor-pointer p-0 block"
+                  >
+                    [ ⚠️ 清空天道造化传承 ]
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Footer Credits */}
+            <div className="text-[10px] text-stone-500 font-serif mt-8 opacity-75">
+              天命莫测，重写定数。三国乱世起，群星逆改。
+            </div>
+          </div>
+        </div>
+      ) : gameState === 'INTRO' ? (
         /* Intro screen styling parchment */
         <div id="intro-screen-parchment" className="flex-1 flex items-center justify-center p-4 py-8 relative z-10">
           <div className="bg-artistic-cream border-4 border-artistic-charcoal rounded-none max-w-2xl w-full p-6 md:p-10 shadow-lg relative animate-scale-up">
@@ -1284,15 +1688,65 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Campaign start selector talent */}
+              <div>
+                <label className="block text-xs font-serif font-bold text-artistic-charcoal mb-2 uppercase tracking-wider">
+                  赋予主公天命大命盘 (初始天赋选择，增减点数直接在开局生效)：
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    { 
+                      id: 'none', 
+                      label: '凡人俗子 (普通)', 
+                      desc: '平平稳稳。起步不受各命盘特质与德行增减微调影响。' 
+                    },
+                    { 
+                      id: 'renyi', 
+                      label: '😇 仁义之君 (德行 +15)', 
+                      desc: '德行(Virtue)开局额外+15，名声+50，初始赠送+150精兵起跑。' 
+                    },
+                    { 
+                      id: 'baonve', 
+                      label: '😈 暴虐无道 (德行 -15 / 武力 +15)', 
+                      desc: '德行(Virtue)开局-15，武力开局高增+15，初始劫掠府库+500黄金。' 
+                    }
+                  ].map((talent) => (
+                    <button
+                      key={talent.id}
+                      type="button"
+                      onClick={() => {
+                        sfx.playClick();
+                        setSelectedTalent(talent.id as any);
+                      }}
+                      className={`text-left p-3 border rounded-none transition-all cursor-pointer ${
+                        selectedTalent === talent.id
+                          ? 'border-[2px] border-artistic-crimson bg-artistic-crimson/5 text-artistic-crimson ring-1 ring-artistic-crimson/20'
+                          : 'border-artistic-charcoal/40 bg-artistic-bg text-artistic-charcoal hover:bg-stone-100'
+                      }`}
+                    >
+                      <div className="font-bold text-xs">{talent.label}</div>
+                      <div className="text-[9px] opacity-85 mt-1 font-serif leading-tight">{talent.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Character stats distributor */}
               <div>
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="text-xs font-bold font-serif text-artistic-charcoal tracking-wide uppercase">
                     分配主公将星属性：
                   </h3>
-                  <span className="text-xs bg-artistic-crimson/10 text-artistic-crimson font-bold font-mono px-2.5 py-0.5 border border-artistic-crimson/20">
-                    可分配底子点数: {creationPoints}
-                  </span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-xs bg-artistic-crimson/10 text-artistic-crimson font-bold font-mono px-2.5 py-0.5 border border-artistic-crimson/20">
+                      可分配底子点数: {creationPoints}
+                    </span>
+                    {sssBonusPoints > 0 && (
+                      <span className="text-[9px] text-amber-800 font-serif font-black mt-1">
+                        (含周目 SSS 评价传承: +{sssBonusPoints})
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-artistic-bg p-4 border border-artistic-charcoal shadow-inner">
@@ -1421,6 +1875,7 @@ export default function App() {
               { id: 'MAP', label: '🗺️ 天下舆图', desc: '据点调兵及州牧出征' },
               { id: 'GOV', label: '🌾 内政经营', desc: '招兵买马开发民生' },
               { id: 'ROSTER', label: '🎴 幕府将佐', desc: '招募良将校场训练' },
+              { id: 'TRAINING', label: '🏋️ 校场修文', desc: '练武锤骨读书明理' },
               { id: 'DIPLOMACY', label: '🤝 诸盟外交', desc: '纵横捭阖赠聘交谊' },
               { id: 'RANDOM_EVENTS', label: '🌠 寻访奇遇', desc: '探机缘博弈属性' },
               { id: 'CIVILIAN_MODS', label: '🔌 民间模组', desc: '创造并装载同人补丁' },
@@ -1479,6 +1934,18 @@ export default function App() {
 
                   {/* Operational Decision selection matrix */}
                   <div className="border-t border-artistic-charcoal pt-4">
+                    {storyTimer !== null && (
+                      <div className="mb-4 bg-[#5c0f11]/5 border border-[#5c0f11]/30 p-2.5 text-xs font-serif text-artistic-charcoal flex justify-between items-center bg-artistic-cream rounded-none animate-pulse">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <span className="text-sm">🗣️</span>
+                          <span className="text-artistic-crimson">军情十万火急！火速行决策印发，对策余息：</span>
+                        </div>
+                        <div className="font-mono text-xs md:text-sm font-black text-[#5c0f11] bg-white px-2 py-0.5 border border-[#5c0f11]/40">
+                          ⏱️ {storyTimer}s
+                        </div>
+                      </div>
+                    )}
+
                     <h4 className="text-xs font-serif font-bold text-artistic-crimson mb-3 tracking-widest uppercase">
                       ♟️ 主公，请即刻布发军策玺令对策：
                     </h4>
@@ -1524,7 +1991,10 @@ export default function App() {
                 <div id="story-archive-sidebar" className="flex flex-col gap-4">
                   
                   {/* Battle Logs Side Panel */}
-                  <div className="bg-artistic-bg border-4 border-artistic-charcoal rounded-none p-5 shadow-sm flex flex-col justify-between min-h-[300px]">
+                  <div className={`bg-artistic-bg border-4 border-artistic-charcoal rounded-none p-5 shadow-sm flex flex-col justify-between min-h-[300px] transition-all duration-350 ${
+                    battleLogAnim === 'shake' ? 'animate-combat-shake border-artistic-crimson' : 
+                    battleLogAnim === 'flash' ? 'animate-combat-flash border-emerald-600' : ''
+                  }`}>
                     <div>
                       <div className="border-b border-artistic-charcoal pb-3 mb-3 flex justify-between items-center">
                         <h3 className="font-serif font-bold text-base text-artistic-charcoal flex items-center gap-1.5">
@@ -1875,6 +2345,26 @@ export default function App() {
               />
             )}
 
+            {gameState === 'TRAINING' && (
+              <TrainingTab
+                playerStats={playerStats}
+                setPlayerStats={setPlayerStats}
+                onAddBattleLog={(msg, type) => setBattleLogs(prev => [
+                  { 
+                    id: 'trn_' + Date.now(), 
+                    chapterId: currentChapterId, 
+                    timestamp: `公元${playerStats.year}年${playerStats.month}月${playerStats.day}日`, 
+                    message: msg, 
+                    type 
+                  }, 
+                  ...prev
+                ])}
+                showToast={showToast}
+                playDrum={() => sfx.playDrum()}
+                playClick={() => sfx.playClick()}
+              />
+            )}
+
             {gameState === 'DIPLOMACY' && (
               <FactionDiplomacy
                 playerStats={playerStats}
@@ -2049,22 +2539,55 @@ export default function App() {
 
                 {/* Final Score and actions */}
                 <div className="space-y-4">
-                  <div className="flex justify-center gap-6 text-xs font-serif bg-artistic-bg p-3 border border-artistic-charcoal/40">
-                    <div>
-                      <div className="text-artistic-charcoal opacity-70">一世天命扭转值</div>
-                      <div className="font-mono text-base font-bold text-artistic-crimson">{playerStats.deviance}%</div>
-                    </div>
-                    <div>
-                      <div className="text-artistic-charcoal opacity-70">麾下名将英豪</div>
-                      <div className="font-mono text-base font-bold text-artistic-charcoal">{recruitedGenerals.length}员</div>
-                    </div>
-                  </div>
+                  {/* Real evaluation analysis block */}
+                  {(() => {
+                    const evalResult = calculateEndingEvaluation(playerStats, recruitedGenerals.length, activeScene.id);
+                    return (
+                      <div className="bg-[#ede0c5] border border-dashed border-artistic-charcoal/40 p-4 rounded-none text-left font-serif mb-4 shadow-inner">
+                        <div className="flex justify-between items-center border-b border-artistic-charcoal/20 pb-2 mb-2">
+                          <span className="font-bold text-xs text-artistic-charcoal">⚖️ 后汉史官评鉴大本纪 (Chronicle Evaluation)</span>
+                          <span className={`text-xl font-mono font-black border-2 px-3 py-0.5 rounded-none ${
+                            evalResult.grade === 'SSS' ? 'text-artistic-crimson border-artistic-crimson bg-artistic-crimson/10 font-bold animate-pulse' : 'text-amber-800 border-amber-800 bg-amber-50'
+                          }`}>
+                            {evalResult.grade} 级
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-3 text-stone-800">
+                          <div>
+                            <span className="text-stone-500">天命扭转度:</span>{' '}
+                            <span className="font-mono font-bold text-artistic-crimson">{playerStats.deviance}%</span>
+                          </div>
+                          <div>
+                            <span className="text-stone-500">麾下英豪员:</span>{' '}
+                            <span className="font-mono font-bold">{recruitedGenerals.length} 员</span>
+                          </div>
+                          <div>
+                            <span className="text-stone-500">德行昭雪:</span>{' '}
+                            <span className="font-mono font-bold">{playerStats.virtue} 点</span>
+                          </div>
+                          <div>
+                            <span className="text-stone-500">军威精兵:</span>{' '}
+                            <span className="font-mono font-bold">{playerStats.troops} 部</span>
+                          </div>
+                        </div>
+                        <div className="text-xs text-stone-700 leading-relaxed italic bg-white/40 p-2.5 border border-stone-300">
+                          <strong className="text-artistic-charcoal not-italic block font-serif font-black mb-1">【史臣评批】</strong>
+                          “ {evalResult.feedback} ”
+                        </div>
+                        {evalResult.grade === 'SSS' && (
+                          <div className="text-[10px] text-emerald-800 font-bold mt-2 bg-emerald-500/10 border border-emerald-600/25 p-1.5 flex items-center gap-1">
+                            <span>🌟 达成 SSS 极境宏图！下一周目底子天赋点加 18 点。（可在此刻或重置后永久生效）</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <button
                     onClick={clearSave}
-                    className="bg-artistic-charcoal hover:bg-artistic-crimson text-artistic-bg py-2 px-6 rounded-none font-serif font-bold text-xs shadow-md transition-all cursor-pointer"
+                    className="w-full bg-artistic-charcoal hover:bg-artistic-crimson text-artistic-bg py-3 px-6 rounded-none font-serif font-black text-xs shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-artistic-bg block"
                   >
-                    重新参悟天理 · 重置大业
+                    👑 重新参悟天理 · 重置大业重开一世
                   </button>
                 </div>
               </div>

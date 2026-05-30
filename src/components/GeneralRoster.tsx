@@ -155,6 +155,7 @@ export default function GeneralRoster({
   const [activeTab, setActiveTab] = useState<'MY_GENERALS' | 'RECRUIT_POOL'>('MY_GENERALS');
   const [selectedGeneral, setSelectedGeneral] = useState<General | null>(null);
   const [trainingLog, setTrainingLog] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'WARRIOR' | 'STRATEGIST' | 'GOVERNOR'>('ALL');
 
   // Sorting & Compare & Biography state variables
   const [sortBy, setSortBy] = useState<'default' | 'force' | 'intelligence' | 'leadership' | 'politics' | 'virtue' | 'loyalty'>('default');
@@ -229,6 +230,24 @@ export default function GeneralRoster({
   // Filter and search generals based on recruitment status
   const filterAndSearch = (list: General[]) => {
     let result = list;
+    if (categoryFilter !== 'ALL') {
+      result = result.filter(g => {
+        const maxVal = Math.max(g.force, g.intelligence, g.leadership, g.politics, g.virtue);
+        if (categoryFilter === 'WARRIOR') {
+          // Warrior: highest is force OR force >= 85
+          return maxVal === g.force || g.force >= 85;
+        }
+        if (categoryFilter === 'STRATEGIST') {
+          // Strategist: highest is intelligence OR intelligence >= 85
+          return maxVal === g.intelligence || g.intelligence >= 85;
+        }
+        if (categoryFilter === 'GOVERNOR') {
+          // Governor: highest is politics, leadership or virtue OR politics >= 80 OR virtue >= 80
+          return maxVal === g.politics || maxVal === g.virtue || g.politics >= 80 || g.virtue >= 80;
+        }
+        return true;
+      });
+    }
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(g => 
@@ -471,6 +490,51 @@ export default function GeneralRoster({
               }`}
             >
               在野贤士馆 ({recruitPool.length}员)
+            </button>
+          </div>
+
+          {/* Quick-Access Category Filters */}
+          <div className="flex flex-wrap gap-2 mb-3 bg-artistic-cream p-2.5 border border-artistic-charcoal/20">
+            <span className="text-xs font-serif font-black text-artistic-charcoal/80 self-center mr-1">才俊分类 (Filters):</span>
+            <button
+              onClick={() => setCategoryFilter('ALL')}
+              className={`px-3 py-1 text-[10.5px] font-serif font-bold transition-all cursor-pointer border ${
+                categoryFilter === 'ALL'
+                  ? 'bg-artistic-charcoal text-[#ede0c5] border-artistic-charcoal font-black'
+                  : 'bg-[#fcfaf2] text-artistic-charcoal border-stone-300 hover:border-artistic-charcoal'
+              }`}
+            >
+              全部 (ALL)
+            </button>
+            <button
+              onClick={() => setCategoryFilter('WARRIOR')}
+              className={`px-3 py-1 text-[10.5px] font-serif font-bold transition-all cursor-pointer border ${
+                categoryFilter === 'WARRIOR'
+                  ? 'bg-[#5c0f11] text-[#ede0c5] border-[#5c0f11] font-black'
+                  : 'bg-[#fcfaf2] text-[#5c0f11] border-[#ffe4e1] hover:border-[#5c0f11]'
+              }`}
+            >
+              ⚔️ 勇武神将 (Warrior)
+            </button>
+            <button
+              onClick={() => setCategoryFilter('STRATEGIST')}
+              className={`px-3 py-1 text-[10.5px] font-serif font-bold transition-all cursor-pointer border ${
+                categoryFilter === 'STRATEGIST'
+                  ? 'bg-blue-800 text-white border-blue-800 font-black'
+                  : 'bg-[#fcfaf2] text-blue-800 border-blue-100 hover:border-blue-800'
+              }`}
+            >
+              💡 智谋军师 (Strategist)
+            </button>
+            <button
+              onClick={() => setCategoryFilter('GOVERNOR')}
+              className={`px-3 py-1 text-[10.5px] font-serif font-bold transition-all cursor-pointer border ${
+                categoryFilter === 'GOVERNOR'
+                  ? 'bg-emerald-800 text-white border-emerald-800 font-black'
+                  : 'bg-[#fcfaf2] text-emerald-800 border-emerald-100 hover:border-emerald-800'
+              }`}
+            >
+              🏗️ 治国能臣 (Governor)
             </button>
           </div>
 

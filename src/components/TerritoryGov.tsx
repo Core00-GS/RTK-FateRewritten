@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { PlayerStats, Region } from '../types';
 import { FACTIONS } from '../data/regions';
 import { Coins, UserPlus, Sprout, Landmark, Gift, Heart, Scale, ShieldAlert, Sun, CloudRain, Snowflake, Bug } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 
 interface TerritoryGovProps {
   playerStats: PlayerStats;
@@ -20,6 +21,7 @@ interface TerritoryGovProps {
   onHarvestTaxes: (totalGoldHarvested: number) => void;
   taxCooldown: boolean;
   onResetTaxCooldown: () => void;
+  activeStance?: 'OFFENSIVE' | 'DEFENSIVE';
 }
 
 export default function TerritoryGov({
@@ -28,13 +30,35 @@ export default function TerritoryGov({
   onGovAction,
   onHarvestTaxes,
   taxCooldown,
-  onResetTaxCooldown
+  onResetTaxCooldown,
+  activeStance = 'DEFENSIVE'
 }: TerritoryGovProps) {
   const [selectedRegionId, setSelectedRegionId] = useState<string>(
     regions.find((r) => r.faction === 'PLAYER')?.id || regions[0].id
   );
 
   const playerControlledRegions = regions.filter((r) => r.faction === 'PLAYER');
+
+  // Compute geopolitical distribution for the Pie Chart representation
+  const factionCounts: Record<string, { name: string; count: number; color: string }> = {};
+  regions.forEach((r) => {
+    const factionId = r.faction || 'HAN';
+    const factionInfo = FACTIONS[factionId] || { name: '其他', color: '#888888' };
+    if (!factionCounts[factionId]) {
+      factionCounts[factionId] = {
+        name: factionInfo.name,
+        count: 0,
+        color: factionInfo.color || '#888888'
+      };
+    }
+    factionCounts[factionId].count++;
+  });
+
+  const pieData = Object.keys(factionCounts).map((key) => ({
+    name: factionCounts[key].name,
+    value: factionCounts[key].count,
+    color: factionCounts[key].color
+  })).sort((a, b) => b.value - a.value);
   const targetRegion = regions.find((r) => r.id === selectedRegionId) || regions[0];
 
   // Dynamic Seasonal & Weather Harvest calculations based on player month stats
@@ -110,7 +134,7 @@ export default function TerritoryGov({
 
   // Find which weather class and icon fits the weatherIndex / weatherName
   let weatherBg = "bg-amber-50 border-amber-200 text-amber-900";
-  let weatherIcon = <Sun className="w-10 h-10 text-amber-500 animate-pulse" />;
+  let weatherIcon = <Sun className="w-10 h-10 text-amber-500" />;
 
   if (weatherName.includes("雨") || weatherName.includes("时雨")) {
     weatherBg = "bg-blue-50/75 border-blue-200 text-blue-900";
@@ -130,41 +154,46 @@ export default function TerritoryGov({
   }
 
   // Dynamic Seasonal UI Styles
-  let seasonBg = "bg-artistic-bg border-artistic-charcoal/80 shadow-[inset_0_0_15px_rgba(0,0,0,0.03)]"; // Default
+  let seasonBg = "bg-artistic-bg shadow-[inset_0_0_15px_rgba(0,0,0,0.03)]"; // Default
   let seasonCreamBg = "bg-[#ede0c5]";
   let seasonThemeBorder = "border-[#3d3228]/40";
   let seasonTitleColor = "text-artistic-charcoal";
   let seasonTextColor = "text-artistic-charcoal opacity-85";
   let seasonButtonClass = "bg-artistic-charcoal hover:bg-artistic-crimson text-artistic-bg";
+  let seasonBorderClass = "border-4 border-double border-artistic-charcoal";
 
   if (m >= 1 && m <= 3) { // Spring (Jade Green / Emerald Calligraphy)
-    seasonBg = "bg-emerald-50/95 border-emerald-800/80 shadow-[inset_0_0_20px_rgba(16,185,129,0.05)]";
+    seasonBg = "bg-emerald-50/95 shadow-[inset_0_0_20px_rgba(16,185,129,0.05)]";
     seasonCreamBg = "bg-emerald-100/50 border border-emerald-200/40";
     seasonThemeBorder = "border-emerald-800/30";
     seasonTitleColor = "text-emerald-950 font-black";
     seasonTextColor = "text-emerald-900";
     seasonButtonClass = "bg-emerald-800 hover:bg-emerald-900 text-white";
+    seasonBorderClass = "border-4 border-double border-emerald-800/90";
   } else if (m >= 4 && m <= 6) { // Summer (Crimson Fire / Amber Red)
-    seasonBg = "bg-red-50/95 border-red-850/80 shadow-[inset_0_0_20px_rgba(239,68,68,0.05)]";
+    seasonBg = "bg-red-50/95 shadow-[inset_0_0_20px_rgba(239,68,68,0.05)]";
     seasonCreamBg = "bg-red-100/50 border border-red-200/40";
     seasonThemeBorder = "border-red-800/30";
     seasonTitleColor = "text-red-950 font-black";
     seasonTextColor = "text-red-900";
     seasonButtonClass = "bg-red-800 hover:bg-red-900 text-white";
-  } else if (m >= 7 && m <= 8) { // Autumn (Ochre Harvest / Warm Amber)
-    seasonBg = "bg-amber-50/95 border-amber-750/80 shadow-[inset_0_0_20px_rgba(245,158,11,0.05)]";
+    seasonBorderClass = "border-4 border-dashed border-red-700/90 [animation-duration:3s]";
+  } else if (m >= 7 && m <= 9) { // Autumn (Ochre Harvest / Warm Amber - Corrected index to include Month 9)
+    seasonBg = "bg-amber-50/95 shadow-[inset_0_0_20px_rgba(245,158,11,0.05)]";
     seasonCreamBg = "bg-amber-100/50 border border-amber-200/40";
     seasonThemeBorder = "border-amber-700/30";
     seasonTitleColor = "text-amber-950 font-black";
     seasonTextColor = "text-amber-900";
-    seasonButtonClass = "bg-amber-700 hover:bg-amber-850 text-white";
-  } else { // Winter (Snow Silver / Ice Slate)
-    seasonBg = "bg-slate-50/95 border-slate-500/80 shadow-[inset_0_0_20px_rgba(148,163,184,0.05)]";
+    seasonButtonClass = "bg-amber-700 hover:bg-amber-800 text-white";
+    seasonBorderClass = "border-4 border-solid border-amber-700/95";
+  } else { // Winter (Snow Silver / Ice Slate - Month 10, 11, 12)
+    seasonBg = "bg-slate-50/95 shadow-[inset_0_0_20px_rgba(148,163,184,0.05)]";
     seasonCreamBg = "bg-slate-100/50 border border-slate-200/40";
     seasonThemeBorder = "border-slate-400/30";
     seasonTitleColor = "text-slate-950 font-black";
     seasonTextColor = "text-slate-900";
     seasonButtonClass = "bg-slate-700 hover:bg-slate-800 text-white";
+    seasonBorderClass = "border-8 border-double border-slate-500/90";
   }
 
   // Calculate total taxes player can collect under current crop/weather variation
@@ -242,19 +271,21 @@ export default function TerritoryGov({
     alert(`【修缮军甲】秘锻黑铁长矛、精铸玄铜护盾，你的军卒战意极其昂扬。武力上升 +1，统率上升 +1！`);
   };
 
+  const scaleTaxRevenue = activeStance === 'DEFENSIVE' ? Math.round(totalTaxRevenue * 0.75) : totalTaxRevenue;
+
   const handleTaxHarvest = () => {
     if (taxCooldown) {
       alert("据点官员正在盘查本季度账簿，各府开库征粮尚需稍候片刻（将在下次回合或选项决策后解封）。");
       return;
     }
-    onHarvestTaxes(totalTaxRevenue);
-    alert(`【季度征收 - ${seasonName}】主公下发玺文，各地府库开拔解送赋税利禄 +${totalTaxRevenue} 黄金入帐下！(当前天候: ${weatherName}，岁效乘数: x${harvestMultiplier.toFixed(2)})`);
+    onHarvestTaxes(scaleTaxRevenue);
+    alert(`【季度征收 - ${seasonName}】主公下发玺文，各地府库开拔解送赋税利禄！${activeStance === 'DEFENSIVE' ? '当前处于「守势 (Defensive)」印契，征赋折缴减税分派 25%。' : ''}各地黄金粮款共计 +${scaleTaxRevenue} 黄金解运入藏！(当前天候: ${weatherName}，岁效乘数: x${harvestMultiplier.toFixed(2)})`);
   };
 
   return (
-    <div id="tk-gov-wrapper" className="grid grid-cols-1 lg:grid-cols-3 gap-6 transition-all duration-500">
+    <div id="tk-gov-wrapper" className="grid grid-cols-1 lg:grid-cols-3 gap-6 transition-all duration-500 relative z-10">
       {/* Dynamic strategic governance actions list */}
-      <div id="gov-command-panel" className={`lg:col-span-2 border-4 rounded-none p-5 shadow-md transition-all duration-500 ${seasonBg}`}>
+      <div id="gov-command-panel" className={`lg:col-span-2 rounded-none p-5 shadow-md transition-all duration-500 ${seasonBg} ${seasonBorderClass}`}>
         <div className={`border-b ${seasonThemeBorder} pb-3 mb-4`}>
           <h3 className={`font-serif font-black text-lg flex items-center gap-1.5 ${seasonTitleColor}`}>
             <Landmark className="w-5 h-5 text-artistic-crimson animate-pulse" />
@@ -265,8 +296,21 @@ export default function TerritoryGov({
 
         {/* Core Actions Matrix */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Action 1: Draft recruits */}
-          <div className={`${seasonCreamBg} border ${seasonThemeBorder} p-4 rounded-none flex flex-col justify-between shadow-sm transition-all duration-500`}>
+          
+          {/* Action 1: Draft recruits WITH Tooltip */}
+          <div className={`${seasonCreamBg} border ${seasonThemeBorder} p-4 rounded-none flex flex-col justify-between shadow-sm transition-all duration-500 relative group`}>
+            {/* Hover Tooltip Card */}
+            <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-3.5 w-60 bg-stone-950 text-stone-100 text-[10.5px] p-3 border border-amber-600 shadow-2xl z-40 font-serif rounded-none leading-relaxed pointer-events-none text-left">
+              <h5 className="font-bold text-amber-400 border-b border-stone-850 pb-0.5 mb-1">💂 张贴招募 (Draft) 裨益：</h5>
+              <p className="text-stone-300">⏱️ **行动耗费**：10 日历程</p>
+              <p className="text-stone-300">🌾 **国库消耗**：200 黄金饷米</p>
+              <div className="mt-1 pb-1 border-t border-stone-800">
+                <p className="text-emerald-400 font-bold">📈 属性 & 军事实录成长：</p>
+                <p>• 中营精锐兵卒: <span className="font-mono text-emerald-300 font-bold">+{1000 + (playerStats.leadership * 5) + (playerControlledRegions.length * 200)}</span> 卒</p>
+                <p>• 主公「<b>统帅 (Leadership)</b>」: <span className="font-mono text-emerald-300">+1</span></p>
+              </div>
+            </div>
+
             <div>
               <div className="flex justify-between items-start mb-2">
                 <span className="bg-artistic-crimson/15 text-artistic-crimson border border-artistic-crimson/30 text-[10.5px] px-2 py-0.5 rounded-none font-serif font-bold">
@@ -275,7 +319,7 @@ export default function TerritoryGov({
                 <span className={`text-xs font-sans font-bold ${seasonTitleColor}`}>🌾 200 黄金</span>
               </div>
               <h4 className={`font-serif font-black text-sm flex gap-1 items-center ${seasonTitleColor}`}>
-                <UserPlus className="w-4 h-4 text-artistic-crimson" />
+                <UserPlus className="w-4 h-4 text-artistic-crimson animate-pulse" />
                 张贴募兵 (积卒万千)
               </h4>
               <p className={`text-xs mt-1 leading-normal mb-3 font-serif ${seasonTextColor}`}>
@@ -290,8 +334,21 @@ export default function TerritoryGov({
             </button>
           </div>
 
-          {/* Action 2: Rice / Relief */}
-          <div className={`${seasonCreamBg} border ${seasonThemeBorder} p-4 rounded-none flex flex-col justify-between shadow-sm transition-all duration-500`}>
+          {/* Action 2: Rice / Relief WITH Tooltip */}
+          <div className={`${seasonCreamBg} border ${seasonThemeBorder} p-4 rounded-none flex flex-col justify-between shadow-sm transition-all duration-500 relative group`}>
+            {/* Hover Tooltip Card */}
+            <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-3.5 w-60 bg-stone-950 text-stone-100 text-[10.5px] p-3 border border-emerald-500 shadow-2xl z-40 font-serif rounded-none leading-relaxed pointer-events-none text-left">
+              <h5 className="font-bold text-emerald-400 border-b border-stone-850 pb-0.5 mb-1">🎁 施粥赈难 (Relief) 裨益：</h5>
+              <p className="text-stone-300">⏱️ **行动耗费**：10 日历程</p>
+              <p className="text-stone-300">🌾 **国库消耗**：150 黄金米粟</p>
+              <div className="mt-1 pb-1 border-t border-stone-800">
+                <p className="text-emerald-400 font-bold">📈 属性 & 势力声望成长：</p>
+                <p>• 声威威名: <span className="font-mono text-emerald-300 font-bold">+45</span></p>
+                <p>• 主公「<b>德行 (Virtue)</b>」: <span className="font-mono text-emerald-300">+1</span></p>
+                <p className="text-[9.5px] text-stone-400 mt-1">💡 提示: 极高德行是在主线中感召赵云、徐庶等极品文武自动来投的先提要案！</p>
+              </div>
+            </div>
+
             <div>
               <div className="flex justify-between items-start mb-2">
                 <span className="bg-emerald-850/10 text-emerald-800 border border-emerald-800/20 text-[10.5px] px-2 py-0.5 rounded-none font-serif font-bold">
@@ -304,7 +361,7 @@ export default function TerritoryGov({
                 施粥赈难 (大博善名)
               </h4>
               <p className={`text-xs mt-1 leading-normal mb-3 font-serif ${seasonTextColor}`}>
-                开库熬取稠粥赠济边关苦命遗孤难民。可累积<b>德行</b>德行值，霸业<b>威望</b>大幅提振腾飞。
+                开库熬取稠粥赠济边关苦命难民。可累积主公<b>德行</b>，势力名主<b>声望</b>大长暴增。
               </p>
             </div>
             <button
@@ -315,8 +372,21 @@ export default function TerritoryGov({
             </button>
           </div>
 
-          {/* Action 3: Farmland / Tillage */}
-          <div className={`${seasonCreamBg} border ${seasonThemeBorder} p-4 rounded-none flex flex-col justify-between shadow-sm col-span-1 md:col-span-2 transition-all duration-500`}>
+          {/* Action 3: Farmland / Tillage WITH Tooltip */}
+          <div className={`${seasonCreamBg} border ${seasonThemeBorder} p-4 rounded-none flex flex-col justify-between shadow-sm col-span-1 md:col-span-2 transition-all duration-500 relative group`}>
+            {/* Hover Tooltip Card */}
+            <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-3.5 w-64 bg-stone-950 text-stone-100 text-[10.5px] p-3 border border-yellow-600 shadow-2xl z-40 font-serif rounded-none leading-relaxed pointer-events-none text-left">
+              <h5 className="font-bold text-yellow-400 border-b border-stone-850 pb-0.5 mb-1">🌾 屯田垦荒 (Tillage) 裨益：</h5>
+              <p className="text-stone-300">⏱️ **行动耗费**：10 日历程</p>
+              <p className="text-stone-300">🌾 **国库消耗**：150 黄金</p>
+              <div className="mt-1 pb-1 border-t border-stone-800">
+                <p className="text-amber-400 font-bold">📈 各地据点与领主属性暴增：</p>
+                <p>• 选定据点开发度: <span className="font-mono text-emerald-300 font-bold">+15%</span> (最高100%)</p>
+                <p>• 选定据点季度税得: <span className="font-mono text-emerald-300 font-bold">+25%</span></p>
+                <p>• 主公「<b>政治 (Politics)</b>」: <span className="font-mono text-emerald-300">+1</span></p>
+              </div>
+            </div>
+
             <div>
               <div className="flex justify-between items-start mb-2">
                 <span className="bg-amber-800/10 text-amber-900 border border-amber-800/20 text-[10.5px] px-2 py-0.5 rounded-none font-serif font-bold">
@@ -325,11 +395,11 @@ export default function TerritoryGov({
                 <span className={`text-xs font-sans font-bold ${seasonTitleColor}`}>🌾 150 黄金</span>
               </div>
               <h4 className={`font-serif font-black text-sm flex gap-1.5 items-center ${seasonTitleColor}`}>
-                <Sprout className="w-4.5 h-4.5 text-amber-900" />
+                <Sprout className="w-4.5 h-4.5 text-amber-950 animate-bounce" />
                 屯田垦荒物阜 (开辟垄亩)
               </h4>
               <p className={`text-xs mt-1 leading-normal mb-3 font-serif text-left ${seasonTextColor}`}>
-                在任意玩家属城开展荒野开掘屯垦、广修水渠灌溉，增加地方纳粮量。<b>政治</b>政治值将大涨。
+                在任意玩家属城开展荒野开掘屯垦、广修水渠灌溉，增加地方纳粮量。主公<b>政治</b>值将增加。
               </p>
               {/* Region selection drop folder */}
               <div className="flex gap-2 items-center mb-3">
@@ -339,7 +409,7 @@ export default function TerritoryGov({
                 <select
                   value={selectedRegionId}
                   onChange={(e) => setSelectedRegionId(e.target.value)}
-                  className="bg-white border border-stone-300 rounded-none text-xs px-2.5 py-1 text-stone-800 font-serif focus:outline-none focus:border-emerald-605"
+                  className="bg-white border border-stone-300 rounded-none text-xs px-2.5 py-1 text-stone-800 font-serif focus:outline-none focus:border-emerald-600"
                 >
                   {regions.map((r) => (
                     <option key={r.id} value={r.id}>
@@ -358,8 +428,21 @@ export default function TerritoryGov({
             </button>
           </div>
 
-          {/* Action 4: Steel Armaments */}
-          <div className={`${seasonCreamBg} border ${seasonThemeBorder} p-4 rounded-none flex flex-col justify-between shadow-sm col-span-1 md:col-span-2 transition-all duration-500`}>
+          {/* Action 4: Steel Armaments WITH Tooltip */}
+          <div className={`${seasonCreamBg} border ${seasonThemeBorder} p-4 rounded-none flex flex-col justify-between shadow-sm col-span-1 md:col-span-2 transition-all duration-500 relative group`}>
+            {/* Hover Tooltip Card */}
+            <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-3.5 w-64 bg-stone-950 text-stone-100 text-[10.5px] p-3 border border-purple-600 shadow-2xl z-40 font-serif rounded-none leading-relaxed pointer-events-none text-left">
+              <h5 className="font-bold text-purple-400 border-b border-stone-850 pb-0.5 mb-1">⚔️ 精铸甲兵 (Armaments) 裨益：</h5>
+              <p className="text-stone-300">⏱️ **行动耗费**：10 日历程</p>
+              <p className="text-stone-300">🌾 **国库消耗**：250 黄金精铜</p>
+              <div className="mt-1 pb-1 border-t border-stone-800">
+                <p className="text-purple-400 font-bold">📈 玄德统御属性双极磨炼：</p>
+                <p>• 裁汰疲碎弱卒: <span className="font-mono text-red-400 font-bold">-200</span> 人（以精练宿卫虎贲）</p>
+                <p>• 主公「<b>武力 (Force)</b>」天资: <span className="font-mono text-emerald-300 font-bold">+1</span></p>
+                <p>• 主公「<b>统帅 (Leadership)</b>」天资: <span className="font-mono text-emerald-300 font-bold">+1</span></p>
+              </div>
+            </div>
+
             <div>
               <div className="flex justify-between items-start mb-2">
                 <span className="bg-purple-800/10 text-purple-900 border border-purple-800/20 text-[10.5px] px-2 py-0.5 rounded-none font-serif font-bold">
@@ -368,11 +451,11 @@ export default function TerritoryGov({
                 <span className={`text-xs font-sans font-bold ${seasonTitleColor}`}>🌾 250 黄金</span>
               </div>
               <h4 className={`font-serif font-black text-sm flex gap-1.5 items-center ${seasonTitleColor}`}>
-                <Scale className="w-4.5 h-4.5 text-purple-900" />
+                <Scale className="w-4.5 h-4.5 text-purple-950" />
                 铸造利刃 · 玄铜配甲 (整军战意)
               </h4>
               <p className={`text-xs mt-1 leading-normal mb-3 font-serif ${seasonTextColor}`}>
-                采购落日黑铁、精金配发将勋，极大地精炼队伍，裁其弱卒长其刃精。主公<b>武力</b>与<b>统率</b>因此大幅提升。
+                采购落日黑铁、精金配发将勋，极大地精炼队伍，裁其弱卒长其刃精。主公<b>武力</b>与<b>统率</b>因此提升。
               </p>
             </div>
             <button
@@ -387,7 +470,7 @@ export default function TerritoryGov({
 
       {/* Taxation ledger panel */}
       <div id="gov-ledger-panel" className="flex flex-col gap-4">
-        <div className={`border-4 rounded-none p-5 shadow-md flex-1 flex flex-col justify-between transition-all duration-500 ${seasonBg}`}>
+        <div className={`rounded-none p-5 shadow-md flex-1 flex flex-col justify-between transition-all duration-500 ${seasonBg} ${seasonBorderClass}`}>
           <div>
             <div className={`border-b ${seasonThemeBorder} pb-3 mb-4`}>
               <h3 className={`font-serif font-black text-lg ${seasonTitleColor}`}>地方仓廪税册</h3>
@@ -398,7 +481,7 @@ export default function TerritoryGov({
             <div className={`border-2 p-3 rounded-none mb-3.5 text-left font-serif transition-all ${weatherBg}`}>
               <div className="flex items-center gap-3">
                 {/* Weather icon effect frame */}
-                <div className="p-2 border border-artistic-charcoal/30 bg-white/70 flex items-center justify-center shadow-xs">
+                <div className="p-2 border border-artistic-charcoal/30 bg-white/70 flex items-center justify-center shadow-xs select-none">
                   {weatherIcon}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -409,7 +492,7 @@ export default function TerritoryGov({
                   <p className="text-stone-800 text-[10.5px] leading-snug mb-1">{weatherDesc}</p>
                   <div className="text-[9.5px] text-stone-600 font-mono font-bold flex justify-between items-center">
                     <span>当季岁产变效比率:</span>
-                    <span className={`text-[11.5px] font-black ${harvestMultiplier >= 1.0 ? 'text-emerald-700 font-bold' : 'text-red-700 font-bold'}`}>
+                    <span className={`text-[11.5px] font-black ${harvestMultiplier >= 1.0 ? 'text-emerald-700' : 'text-red-700'}`}>
                       x{harvestMultiplier.toFixed(2)}
                     </span>
                   </div>
@@ -418,7 +501,7 @@ export default function TerritoryGov({
             </div>
 
             {/* List of player controlled cities with localized tax details */}
-            <div className="space-y-2 max-h-[260px] overflow-y-auto mb-4 pr-1 scrollbar-ink">
+            <div className="space-y-2 max-h-[200px] overflow-y-auto mb-4 pr-1 scrollbar-ink">
               <div className={`flex justify-between text-[11px] font-bold border-b pb-1 font-serif ${seasonTitleColor} ${seasonThemeBorder}`}>
                 <span>控制据点</span>
                 <span>税入</span>
@@ -443,8 +526,11 @@ export default function TerritoryGov({
 
             {/* Sum taxation stats */}
             <div className={`p-3 rounded-none border ${seasonThemeBorder} mb-4 flex justify-between items-center text-xs ${seasonCreamBg}`}>
-              <span className={`font-serif font-black ${seasonTitleColor}`}>本季总赋税黄金：</span>
-              <span className="font-sans font-black text-emerald-800 text-sm">+{totalTaxRevenue} 黄金</span>
+              <span className={`font-serif font-black ${seasonTitleColor}`}>本季总赋税粮款：</span>
+              <span className="font-sans font-black text-emerald-800 text-sm">
+                +{scaleTaxRevenue} 黄金 
+                {activeStance === 'DEFENSIVE' && <span className="text-[10px] text-red-700 font-bold ml-1">(守势折扣-25%)</span>}
+              </span>
             </div>
           </div>
 
@@ -465,6 +551,65 @@ export default function TerritoryGov({
             <p className={`text-[10px] text-center mt-2.5 font-serif italic ${seasonTextColor}`}>
               * 征税每季度将在选项决策、主奇演义后自动恢纳为可取敛状态。
             </p>
+          </div>
+        </div>
+
+        {/* Geopolitical Situation Pie Chart */}
+        <div id="geopolitical-dist-card" className={`rounded-none p-5 shadow-md flex flex-col justify-between transition-all duration-500 ${seasonBg} ${seasonBorderClass}`}>
+          <div>
+            <div className={`border-b ${seasonThemeBorder} pb-3 mb-3`}>
+              <h3 className={`font-serif font-black text-sm ${seasonTitleColor}`}>神州大势：各方势力割据占比</h3>
+              <p className={`text-[10px] font-serif ${seasonTextColor}`}>大汉十三州地缘控制比率</p>
+            </div>
+            
+            <div className="h-[140px] w-full flex items-center justify-center relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={28}
+                    outerRadius={46}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        const percentage = ((data.value / regions.length) * 100).toFixed(1);
+                        return (
+                          <div className="bg-[#ede0c5] border-2 border-artistic-charcoal p-2 text-[10px] font-serif shadow-md select-none">
+                            <p className="font-bold text-[#5c0f11]">{data.name}</p>
+                            <p className="text-stone-800">占领据点: {data.value} 个 ({percentage}%)</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute flex flex-col items-center justify-center select-none pointer-events-none text-center">
+                <span className="text-[9px] font-serif font-bold text-stone-500 leading-none">据点数</span>
+                <span className="text-xs font-sans font-black text-stone-900 leading-none mt-1">{regions.length}</span>
+              </div>
+            </div>
+
+            {/* Faction Legends list */}
+            <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[9px] font-serif font-bold border-t border-stone-250 pt-2.5">
+              {pieData.slice(0, 6).map((d, i) => (
+                <div key={i} className="flex items-center gap-1.5 truncate">
+                  <div className="w-2.5 h-2.5 shrink-0 border border-stone-800/10" style={{ backgroundColor: d.color }} />
+                  <span className={`${seasonTextColor} truncate`}>{d.name}: {d.value}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

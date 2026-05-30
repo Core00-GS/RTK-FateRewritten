@@ -14,6 +14,7 @@ interface QuestListProps {
   regions: Region[];
   onQuestUpdate: (questId: string, status: 'ACTIVE' | 'COMPLETED' | 'FAILED', rewards?: any, lossTroops?: number) => void;
   onSetLocation: (regionId: string) => void;
+  activeStance?: 'OFFENSIVE' | 'DEFENSIVE';
 }
 
 export default function QuestList({
@@ -22,7 +23,8 @@ export default function QuestList({
   playerLocation,
   regions,
   onQuestUpdate,
-  onSetLocation
+  onSetLocation,
+  activeStance = 'DEFENSIVE'
 }: QuestListProps) {
   const [activeQuest, setActiveQuest] = useState<SideQuest | null>(null);
   const [selectedChoiceIdx, setSelectedChoiceIdx] = useState<number | null>(null);
@@ -73,7 +75,7 @@ export default function QuestList({
     let attributeVal = 50;
 
     if (choice.checkType === 'force') {
-      attributeVal = playerStats.force;
+      attributeVal = playerStats.force + (activeStance === 'OFFENSIVE' ? 15 : 0);
       playerBonus = Math.floor(attributeVal / 3);
     } else if (choice.checkType === 'intelligence') {
       attributeVal = playerStats.intelligence;

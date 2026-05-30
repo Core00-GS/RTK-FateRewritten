@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Region, FactionId, PlayerStats } from '../types';
 import { FACTIONS } from '../data/regions';
 import { Shield, Sparkles, Navigation, Info, TrendingUp, Users } from 'lucide-react';
@@ -31,6 +31,45 @@ export default function ThreeKingdomsMap({
     regions.find((r) => r.id === playerLocation) || regions[0]
   );
   const [transferAmount, setTransferAmount] = useState<number>(1000);
+  
+  const [prevLocation, setPrevLocation] = useState<string>(playerLocation);
+  const [marchAnim, setMarchAnim] = useState<{
+    fromX: number;
+    fromY: number;
+    toX: number;
+    toY: number;
+    active: boolean;
+  } | null>(null);
+  const [marchProgress, setMarchProgress] = useState<number>(0);
+
+  useEffect(() => {
+    if (playerLocation !== prevLocation) {
+      const oldRegion = regions.find(r => r.id === prevLocation);
+      const newRegion = regions.find(r => r.id === playerLocation);
+      setPrevLocation(playerLocation);
+      if (oldRegion && newRegion) {
+        setMarchAnim({
+          fromX: oldRegion.x,
+          fromY: oldRegion.y,
+          toX: newRegion.x,
+          toY: newRegion.y,
+          active: true
+        });
+        setMarchProgress(0);
+        const progressTimer = setTimeout(() => {
+          setMarchProgress(1);
+        }, 50);
+
+        const timer = setTimeout(() => {
+          setMarchAnim(null);
+        }, 1600);
+        return () => {
+          clearTimeout(progressTimer);
+          clearTimeout(timer);
+        };
+      }
+    }
+  }, [playerLocation, prevLocation, regions]);
 
   const activeQuestRegions = new Set(activeQuests.map(q => q.targetRegionId));
 
@@ -119,7 +158,40 @@ export default function ThreeKingdomsMap({
                 return null;
               })
             )}
+
+            {/* Travel march route dash animation line */}
+            {marchAnim && (
+              <line
+                x1={marchAnim.fromX}
+                y1={marchAnim.fromY}
+                x2={marchAnim.toX}
+                y2={marchAnim.toY}
+                stroke="#8d1d1f"
+                strokeWidth="2.5"
+                strokeDasharray="4,4"
+                className="animate-[pulse_1s_infinite]"
+                opacity="0.9"
+              />
+            )}
           </svg>
+
+          {/* Marching troop line/horse avatar overlay */}
+          {marchAnim && (
+            <div 
+              className="absolute z-30 transform -translate-x-1/2 -translate-y-1/2 transition-all duration-[1500ms] ease-linear pointer-events-none select-none flex flex-col items-center"
+              style={{
+                left: `${marchProgress === 1 ? marchAnim.toX : marchAnim.fromX}%`,
+                top: `${marchProgress === 1 ? marchAnim.toY : marchAnim.fromY}%`
+              }}
+            >
+              <div className="flex flex-col items-center">
+                <span className="text-2xl animate-bounce">🐎</span>
+                <span className="bg-[#5c0f11] text-[#fcfaf2] text-[8px] font-serif border border-amber-300 px-1 py-0.5 rounded-none font-bold shadow-md whitespace-nowrap leading-none scale-90">
+                  三军召急行军中...
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Render individual regions */}
           {regions.map((region) => {
@@ -142,17 +214,17 @@ export default function ThreeKingdomsMap({
                   {isPlayerHere && (
                     <span className="absolute inline-flex h-10 w-10 animate-ping rounded-full bg-amber-400 opacity-60"></span>
                   )}
-                  {/* Pulse for side quests (only trigger if revealed) */}
+                  {/* Live Quest Radar Indicator */}
                   {hasQuest && !isPlayerHere && regionRevealed && (
-                    <span className="absolute inline-flex h-8 w-8 animate-ping rounded-full bg-red-400 opacity-40"></span>
+                    <span className="absolute inline-flex h-8 w-8 animate-ping rounded-full bg-red-400/50"></span>
                   )}
 
                   {/* Main Node Dot */}
                   <div
-                    className={`w-5 h-5 rounded-none border-2 shadow-md flex items-center justify-center transition-all ${
+                    className={`w-5.5 h-5.5 rounded-none border-2 shadow-md flex items-center justify-center transition-all duration-300 ${
                       isSelected
-                        ? 'border-artistic-crimson scale-125 ring-2 ring-artistic-crimson/55'
-                        : 'border-artistic-charcoal group-hover:scale-110'
+                        ? 'border-artistic-crimson scale-125 ring-2 ring-artistic-crimson/55 shadow-[0_0_15px_rgba(180,83,9,0.7)]'
+                        : 'border-artistic-charcoal group-hover:scale-125 group-hover:border-amber-500 group-hover:shadow-[0_0_15px_rgba(245,158,11,0.85)]'
                     }`}
                     style={{ backgroundColor: regionRevealed ? faction.color : '#78716c' }}
                   >
@@ -179,17 +251,47 @@ export default function ThreeKingdomsMap({
                     </span>
                   )}
 
-                  {/* Hover tooltips/Label */}
-                  <div className={`absolute top-6 left-1/2 -translate-x-1/2 whitespace-nowrap bg-artistic-charcoal text-artistic-bg text-[10.5px] px-2.5 py-1 rounded-none border border-artistic-charcoal transition-all z-20 ${
-                    isSelected ? 'opacity-100' : 'opacity-85 group-hover:opacity-100'
+                  {/* Standard Label & Garrison Strength Overlay */}
+                  <div className={`absolute top-6 left-1/2 -translate-x-1/2 whitespace-nowrap bg-artistic-charcoal text-[#ede0c5] text-[9.5px] px-2 py-0.5 rounded-none border border-artistic-charcoal/80 transition-all z-20 flex flex-col items-center shadow-lg ${
+                    isSelected ? 'opacity-100 ring-2 ring-amber-550 scale-105' : 'opacity-90 group-hover:opacity-100 group-hover:scale-105'
                   }`}>
-                    <span className="font-serif font-bold">
-                      {regionRevealed ? region.name : `${region.name} (🌁 雾锁)`}
+                    <span className="font-serif font-black tracking-wide">
+                      {regionRevealed ? region.name : `${region.name} (🌁)`}
                     </span>
-                    {regionRevealed && region.garrison > 0 && (
-                      <span className="ml-1 text-[9px] text-[#ede0c5]">
-                        ({(region.garrison / 1000).toFixed(1)}k)
+                    {regionRevealed && (
+                      <span className="text-[8px] font-mono font-bold text-amber-300 border-t border-[#ede0c5]/20 w-full mt-0.5 pt-0.5 text-center flex items-center justify-center gap-0.5">
+                        💂 {region.garrison.toLocaleString()}
                       </span>
+                    )}
+                  </div>
+
+                  {/* Enhanced Hover Tactical Tooltip Card */}
+                  <div className="absolute top-11 left-1/2 -translate-x-1/2 bg-[#fcfaf2] text-[#2a2319] text-[9px] p-2 rounded-none border-2 border-artistic-charcoal shadow-2xl transition-all duration-150 z-30 pointer-events-none opacity-0 scale-95 invisible group-hover:opacity-100 group-hover:visible group-hover:scale-100 min-w-[155px] font-serif text-left">
+                    <div className="border-b border-[#5c0f11] pb-1 mb-1 flex justify-between items-center gap-2">
+                      <strong className="text-xs text-[#5c0f11] font-serif font-black">{region.name}</strong>
+                      <span className="text-[8px] bg-stone-200 border border-stone-400 text-stone-700 px-1 font-bold leading-none scale-90">
+                        {regionRevealed ? faction.name : '未知宿守'}
+                      </span>
+                    </div>
+                    {regionRevealed ? (
+                      <div className="space-y-0.5 font-serif">
+                        <div className="flex justify-between gap-1 text-stone-600">
+                          <span>💂 军民防务:</span>
+                          <span className="font-mono font-bold text-stone-900">{region.garrison.toLocaleString()}人</span>
+                        </div>
+                        <div className="flex justify-between gap-1 text-stone-600">
+                          <span>🌾 季度税饷:</span>
+                          <span className="font-mono font-bold text-emerald-850">+{region.revenue} 黄金</span>
+                        </div>
+                        <div className="flex justify-between gap-1 text-stone-600">
+                          <span>🏗️ 属县开垦:</span>
+                          <span className="font-mono font-bold text-amber-850">{region.development}%</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-stone-550 italic leading-snug">
+                        战火浓重雾锁，据守、季度屯粮级别皆不可查。请移宿军旅，遣哨开拓！
+                      </div>
                     )}
                   </div>
                 </div>
@@ -211,113 +313,146 @@ export default function ThreeKingdomsMap({
           const faction = FACTIONS[selectedRegion.faction] || FACTIONS.HAN;
 
           return (
-            <div className="bg-artistic-bg border-4 border-artistic-charcoal rounded-none p-5 shadow-md flex-1 flex flex-col justify-between">
-              <div>
-                {/* Header Info */}
-                <div className="border-b border-artistic-charcoal pb-3 mb-4">
-                  <div className="flex justify-between items-start mb-1">
-                    <h3 className="font-serif font-black text-2xl text-artistic-charcoal">
-                      {regionRevealed ? selectedRegion.name : `${selectedRegion.name} (🌁 未探明)`}
-                    </h3>
-                    <span className={`text-[10px] px-2.5 py-1 font-serif font-bold border rounded-none ${
-                      regionRevealed ? faction.badgeClass : 'bg-stone-200 text-stone-600 border-stone-400/40'
-                    }`}>
-                      {regionRevealed ? faction.name : '未知驻军势力'}
-                    </span>
+            <div className="bg-[#fcfaf2] border-4 border-artistic-charcoal rounded-none p-5 shadow-md flex-1 flex flex-col justify-between">
+              {/* Dynamic 2-column layout to separate Static Info vs Actions */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Column 1: Static Info */}
+                <div id="region-static-info" className="space-y-4">
+                  <div>
+                    <div className="flex justify-between items-start gap-2 flex-wrap mb-1.5">
+                      <h4 className="font-serif font-black text-xl text-artistic-charcoal leading-none">
+                        {regionRevealed ? selectedRegion.name : `${selectedRegion.name} (🌁 未探明)`}
+                      </h4>
+                      <span className={`text-[9px] px-2 py-0.5 font-serif font-bold border rounded-none leading-none scale-95 ${
+                        regionRevealed ? faction.badgeClass : 'bg-stone-200 text-stone-600 border-stone-400'
+                      }`}>
+                        {regionRevealed ? faction.name : '未知驻守'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-stone-600 leading-relaxed italic font-serif">
+                      {regionRevealed 
+                        ? `“${selectedRegion.description}”`
+                        : '“此城市仍笼罩于地方乱兵浓雾之中。派遣行马哨军出关游历，方可开辟根据。拓土可收取租金、召集流民，亦能查阅守备之虚实。”'
+                      }
+                    </p>
                   </div>
-                  <p className="text-xs text-artistic-ink leading-relaxed mt-1 italic font-serif opacity-90">
-                    {regionRevealed 
-                      ? `“${selectedRegion.description}”`
-                      : '“此地区笼罩在沙场传令不通之浓重迷雾下。你目前未占领此处，亦未派遣人马移守、巡查，城中守将、屯田规模及商业产出一律不明。”'
-                    }
-                  </p>
-                </div>
 
-                {/* Parameters metrics list */}
-                <div className="grid grid-cols-2 gap-3.5 text-xs text-artistic-ink mb-5">
-                  <div className="bg-artistic-cream p-2.5 rounded-none border border-artistic-charcoal/20 flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-emerald-800" />
-                    <div>
-                      <div className="text-[9px] text-artistic-charcoal opacity-70">地方开发度</div>
-                      <div className="font-bold">{regionRevealed ? `${selectedRegion.development} / 100` : '?? / 100'}</div>
-                    </div>
-                  </div>
-                  <div className="bg-artistic-cream p-2.5 rounded-none border border-artistic-charcoal/20 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-amber-800" />
-                    <div>
-                      <div className="text-[9px] text-artistic-charcoal opacity-70">每季税粮产出</div>
-                      <div className="font-bold">{regionRevealed ? `+${selectedRegion.revenue} 黄金` : '?? 黄金'}</div>
-                    </div>
-                  </div>
-                  <div className="bg-artistic-cream p-2.5 rounded-none border border-artistic-charcoal/20 col-span-2 flex items-center gap-3">
-                    <Users className="w-4.5 h-4.5 text-artistic-crimson" />
-                    <div>
-                      <div className="text-[9px] text-artistic-charcoal opacity-70">据守屯田守军</div>
-                      <div className="font-bold text-sm">
-                        {regionRevealed 
-                          ? `${selectedRegion.garrison.toLocaleString()} 义勇军` 
-                          : '???? 人驻屯'
-                        }
+                  {/* Operational indicators / stats */}
+                  <div className="space-y-2 border-t border-stone-200 pt-3">
+                    <h5 className="text-[10px] font-bold font-serif text-stone-400 uppercase tracking-wider">据地建设与产出级别：</h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="bg-[#faf5ec] p-2 border border-stone-300/40 font-serif">
+                        <div className="text-[9px] text-[#5c0f11] font-bold flex items-center gap-1">
+                          <TrendingUp className="w-3 h-3 text-[#5c0f11]" />
+                          <span>辖区耕地开发</span>
+                        </div>
+                        <div className="font-sans font-bold text-xs text-stone-800 mt-0.5">
+                          {regionRevealed ? `${selectedRegion.development} / 100` : '?? / 100'}
+                        </div>
+                      </div>
+                      <div className="bg-[#faf5ec] p-2 border border-stone-300/40 font-serif">
+                        <div className="text-[9px] text-emerald-800 font-bold flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-emerald-700" />
+                          <span>季度赋金增益</span>
+                        </div>
+                        <div className="font-sans font-bold text-xs text-stone-800 mt-0.5">
+                          {regionRevealed ? `+${selectedRegion.revenue} 黄金 / 季` : '?? 黄金 / 季'}
+                        </div>
+                      </div>
+                      <div className="bg-[#faf5ec] p-2 border border-stone-300/40 font-serif col-span-1 sm:col-span-2">
+                        <div className="text-[9px] text-[#5c0f11] font-bold flex items-center gap-1">
+                          <Users className="w-3.5 h-3.5" />
+                          <span>辖地城内守兵</span>
+                        </div>
+                        <div className={`font-sans font-black text-sm mt-0.5 transition-all ${
+                          regionRevealed && selectedRegion.garrison > 5000 
+                            ? 'text-amber-700 animate-pulse font-black' 
+                            : 'text-stone-900'
+                        }`}>
+                          {regionRevealed 
+                            ? `${selectedRegion.garrison.toLocaleString()} 兵卒` 
+                            : '???? 人驻守'
+                          }
+                          {regionRevealed && selectedRegion.garrison > 5000 && (
+                            <span className="ml-1.5 text-[9px] bg-amber-100 text-amber-800 border border-amber-300 px-1 py-0.5 rounded-none font-serif tracking-widest font-bold">
+                              🏰 雄关重镇
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Quick interactive actions based on selection */}
-                <div className="border-t border-artistic-charcoal/25 pt-4">
-                  {selectedRegion.id === playerLocation ? (
-                    <div className="bg-emerald-500/10 border-l-4 border-emerald-600 p-3 rounded-none text-xs leading-relaxed flex gap-2">
-                      <Info className="w-4 h-4 shrink-0 mt-0.5 text-emerald-800" />
-                      <span className="text-emerald-950 font-serif">
-                        当前正率军伫留在 <strong>{selectedRegion.name}</strong> 驻守。可在<b>“内政经营”</b>中修缮开发此大据点，或在<b>“奇遇演义”</b>栏目触发该城奇遇章。
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-2">
+                {/* Column 2: Active Actions */}
+                <div id="region-active-actions" className="space-y-4 border-t md:border-t-0 md:border-l border-stone-200 pt-4 md:pt-0 md:pl-6 flex flex-col justify-between">
+                  <div>
+                    <h5 className="text-[10px] font-bold font-serif text-stone-400 uppercase tracking-wider mb-2">执行政军事令:</h5>
+                    {selectedRegion.id === playerLocation ? (
+                      <div className="bg-emerald-500/10 border-l-4 border-emerald-600 p-2.5 text-[11px] leading-relaxed flex gap-2">
+                        <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-emerald-800" />
+                        <span className="text-emerald-950 font-serif">
+                          大军目前驻防驻留于 <strong>{selectedRegion.name}</strong> 辖区。主公可于<b>“内政经营”</b>中治水兴修，或探索本地区侧翼奇闻演义。
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 items-center justify-start animate-fade-in">
+                        <button
+                          onClick={handleTravelClick}
+                          className="flex-1 min-w-[200px] bg-[#5c0f11] hover:bg-artistic-crimson text-[#fcfaf2] py-2.5 px-3 rounded-none font-serif font-black text-xs tracking-widest uppercase transition-colors duration-200 cursor-pointer shadow-md text-center"
+                        >
+                          {regionRevealed 
+                            ? `策马行军至 ${selectedRegion.name}` 
+                            : `🔭 斥候哨骑开道：移驻 ${selectedRegion.name}`
+                          }
+                        </button>
+                        <p className="w-full text-[9px] text-[#5c0f11] italic font-serif leading-none mt-1">
+                          * 急行军消耗较轻：25 黄金军饷、6 日程。
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Local transfer: only if player controls region AND it is revealed */}
+                  {selectedRegion.faction === 'PLAYER' && regionRevealed && (
+                    <div className="bg-[#faf5ec] p-2.5 border border-stone-300/60 rounded-none shadow-xs">
+                      <h6 className="text-[10px] font-serif font-bold text-artistic-crimson mb-2 flex items-center gap-1 border-b border-stone-200 pb-1 uppercase tracking-wide">
+                        <Shield className="w-3.5 h-3.5" />
+                        大将往该城要塞调防
+                      </h6>
+                      <div className="flex gap-2 items-center mb-1.5">
+                        <input
+                          type="range"
+                          min="500"
+                          max={Math.max(500, playerStats.troops)}
+                          step="500"
+                          value={transferAmount}
+                          onChange={(e) => setTransferAmount(Number(e.target.value))}
+                          className="flex-1 accent-artistic-crimson cursor-pointer"
+                        />
+                        <span className="text-[11px] font-bold text-stone-900 font-mono min-w-[50px] text-right shrink-0">
+                          {transferAmount}人
+                        </span>
+                      </div>
                       <button
-                        onClick={handleTravelClick}
-                        className="w-full bg-artistic-charcoal hover:bg-artistic-crimson text-artistic-bg py-2.5 px-4 rounded-none font-serif font-bold text-xs tracking-widest uppercase transition-colors duration-200 cursor-pointer shadow-sm animate-fade-in"
+                        onClick={handleTransfer}
+                        disabled={playerStats.troops < 500}
+                        className="w-full bg-artistic-charcoal hover:bg-artistic-crimson disabled:bg-stone-300 disabled:text-stone-500 text-[#ede0c5] py-1.5 px-2 rounded-none text-[10.5px] font-serif font-black transition-colors cursor-pointer shadow-sm text-center"
                       >
-                        {regionRevealed ? `策马游历至 ${selectedRegion.name} (小耗25金)` : `🔭 遣哨侦收兵并移驻 ${selectedRegion.name} (开辟迷雾，耗25金)`}
+                        确认部阵进屯守卫 ({playerStats.troops >= 500 ? "领兵发遣" : "兵力告竭"})
                       </button>
-                      <p className="text-[10px] text-artistic-charcoal opacity-75 text-center italic font-serif">
-                        * 移驻需耗费少许车马军费与 6 日程。可驱逐当地天灾流匪迷雾并将其永久探明。
-                      </p>
                     </div>
                   )}
                 </div>
+
               </div>
 
-              {/* Faction deployment: only if player controls region AND it's explored */}
-              {selectedRegion.faction === 'PLAYER' && regionRevealed && (
-                <div className="border-t border-artistic-charcoal/30 pt-4 mt-4">
-                  <h4 className="text-xs font-serif font-bold text-artistic-crimson mb-2 flex items-center gap-1.5">
-                    <Shield className="w-3.5 h-3.5 text-artistic-crimson" />
-                    往根据地大举调兵屯守
-                  </h4>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="range"
-                      min="500"
-                      max={Math.max(500, playerStats.troops)}
-                      step="500"
-                      value={transferAmount}
-                      onChange={(e) => setTransferAmount(Number(e.target.value))}
-                      className="flex-1 accent-artistic-crimson"
-                    />
-                    <span className="text-xs font-bold text-artistic-charcoal min-w-[50px] text-right">
-                      {transferAmount}人
-                    </span>
-                  </div>
-                  <button
-                    onClick={handleTransfer}
-                    disabled={playerStats.troops < 500}
-                    className="w-full mt-2.5 bg-artistic-charcoal hover:bg-artistic-crimson disabled:bg-stone-300 disabled:text-stone-500 text-artistic-bg py-2 px-3 rounded-none text-xs font-serif font-extrabold transition-colors cursor-pointer shadow-sm text-center block uppercase tracking-wider"
-                  >
-                    确认调遣大将驻防此地
-                  </button>
-                </div>
-              )}
+              {/* Subtitle footer info bar */}
+              <div className="border-t border-dashed border-stone-300 pt-2.5 mt-4 text-[9.5px] text-stone-500 font-serif flex justify-between items-center bg-stone-50/50 px-2 py-1 rounded-none select-none">
+                <span>州郡要害地缘交错，握之则安，弃之则危。</span>
+                <span>主公中营义勇行斥：{playerStats.troops.toLocaleString()} 兵卒</span>
+              </div>
             </div>
           );
         })() : (
