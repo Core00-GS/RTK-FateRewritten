@@ -187,6 +187,93 @@ export default function FactionDiplomacy({
     }
   };
 
+  // Trade 1: Recruits
+  const tradeTroops = () => {
+    if (activeRelation < 10) {
+      showToast(`【${activeFaction.name}】由于交谊冷淡（关系需 10 响以上），谢绝开放榷场征募通商！`);
+      return;
+    }
+    const cost = 250;
+    if (playerStats.gold < cost) {
+      showToast(`国库黄金储备不足 ${cost}，无力支付召募精锐开销！`);
+      return;
+    }
+    setPlayerStats(prev => ({
+      ...prev,
+      gold: prev.gold - cost,
+      troops: prev.troops + 600
+    }));
+    const msg = `🤝 【良合兵互市】主公大拨钱粮 $${cost} 黄金送抵【${activeFaction.name}】榷场，作为借饷招引其属下 600 名披甲重卒入阵效命！`;
+    onAddBattleLog(msg, 'gain');
+    showToast(`募兵大成功！成功购入 600 名【${activeFaction.name}】精锐守备！`);
+  };
+
+  // Trade 2: Book
+  const tradeBook = () => {
+    if (activeRelation < 15) {
+      showToast(`【${activeFaction.name}】由于不信你（关系需 15 响以上），认为此珍籍为秘典，谢绝质换。`);
+      return;
+    }
+    const cost = 350;
+    if (playerStats.gold < cost) {
+      showToast(`国库黄金储备不足 ${cost}，买不起稀有太公兵书。`);
+      return;
+    }
+    setPlayerStats(prev => ({
+      ...prev,
+      gold: prev.gold - cost,
+      intelligence: prev.intelligence + 3,
+      leadership: prev.leadership + 2
+    }));
+    const msg = `🤝 【奇典互市】主公投送 $${cost} 黄金，购得【${activeFaction.name}】馆藏大典《太公阴符经》善本。精读后，智力 +3，统帅 +2！`;
+    onAddBattleLog(msg, 'gain');
+    showToast("典籍互市成功！智力提升+3，统帅+2！");
+  };
+
+  // Trade 3: Steed
+  const tradeSteed = () => {
+    if (activeRelation < 25) {
+      showToast(`【${activeFaction.name}】对主公戒心甚烈（关系需 25 响以上），不愿交易其大将军亲随绝尘良马。`);
+      return;
+    }
+    const cost = 450;
+    if (playerStats.gold < cost) {
+      showToast(`国库黄金储备不足 ${cost}，买不起西域神驹。`);
+      return;
+    }
+    setPlayerStats(prev => ({
+      ...prev,
+      gold: prev.gold - cost,
+      force: prev.force + 3,
+      prestige: prev.prestige + 50
+    }));
+    const msg = `🤝 【名马互市】主公掷金 $${cost}，购得【${activeFaction.name}】进献之后藏汗血纯种白白战马。大壮行阵，武力 +3，声望大幅提升 +50响！`;
+    onAddBattleLog(msg, 'gain');
+    showToast("战马互市成功！武力提升+3，声望+50！");
+  };
+
+  // Trade 4: Silk
+  const tradeSilk = () => {
+    if (activeRelation < 10) {
+      showToast(`【${activeFaction.name}】认为商界尚未安定（关系需 10 响以上），谢绝了大宗丝绸贸易提议。`);
+      return;
+    }
+    const cost = 150;
+    if (playerStats.gold < cost) {
+      showToast(`国库黄金储备不足 ${cost}，购不起奢侈绸缎。`);
+      return;
+    }
+    setPlayerStats(prev => ({
+      ...prev,
+      gold: prev.gold - cost,
+      prestige: prev.prestige + 80,
+      popularity: prev.popularity + 5
+    }));
+    const msg = `🤝 【大宗绢帛通商】主公出资 $${cost}，向【${activeFaction.name}】榷商吃下大宗江东丝织精品。百姓士子高声称道，声望 +80，民心 +5！`;
+    onAddBattleLog(msg, 'gain');
+    showToast("大宗丝绸互换告捷！民声高昂，声望大幅攀升！");
+  };
+
   return (
     <div id="diplomacy-interface-panel" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Target Factions Select List */}
@@ -381,6 +468,112 @@ export default function FactionDiplomacy({
                 className="w-full bg-artistic-crimson hover:bg-stone-900 disabled:bg-stone-300 disabled:text-stone-500 disabled:border-stone-400 text-white font-serif font-bold text-xs py-2 px-3 border border-transparent transition-colors cursor-pointer"
               >
                 {playerStats.force < 75 && playerStats.leadership < 70 ? "大将声威不足以服众" : "大发檄书威恐劫夺钱粮"}
+              </button>
+            </div>
+          </div>
+
+          {/* Trade Resources & Mutual Markets Panel */}
+          <h3 className="font-serif font-black text-sm text-artistic-charcoal mt-6 mb-3 border-l-4 border-amber-800 pl-2.5">
+            🤝 互市通商局 (Trade Resources with Friendly Factions)
+          </h3>
+          <p className="text-[11px] text-stone-600 font-serif leading-relaxed mb-3">
+            两方关系融睦、边关榷场开启（<b>修好关系需达 10 响以上</b>）即可开展大宗边关互市通商，向友邦倾销余粮黄金，换召其精勇或质购绝域珍宝：
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Trade 1: Recruits */}
+            <div className="bg-amber-50/50 border border-amber-800/20 p-3.5 rounded-none flex flex-col justify-between shadow-sm">
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <h4 className="font-serif font-black text-sm text-amber-950 flex gap-1 items-center">
+                    💂‍♂️ 交换精勇兵员
+                  </h4>
+                  <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-700/20 px-1.5 py-0.5 font-bold">
+                    🌾 250 黄金
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-700 font-serif leading-relaxed mb-3">
+                  互通有无，支付安集募金向该势力征募 <b>600 名披甲执锐行军精壮兵卒</b>，迅速扩充中营。
+                </p>
+              </div>
+              <button
+                onClick={tradeTroops}
+                disabled={activeRelation < 10}
+                className="w-full bg-amber-800 hover:bg-amber-900 disabled:bg-stone-200 disabled:text-stone-400 disabled:border-stone-300 text-white font-serif font-bold text-xs py-2 px-3 border border-amber-950 transition-colors cursor-pointer"
+              >
+                {activeRelation < 10 ? "关系冷淡谢绝对流募卒 (需>=10响)" : "募征 600 名友军精锐"}
+              </button>
+            </div>
+
+            {/* Trade 2: Books */}
+            <div className="bg-amber-50/50 border border-amber-800/20 p-3.5 rounded-none flex flex-col justify-between shadow-sm">
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <h4 className="font-serif font-black text-sm text-amber-950 flex gap-1 items-center">
+                    📖 质印秘本兵书
+                  </h4>
+                  <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-700/20 px-1.5 py-0.5 font-bold">
+                    🌾 350 黄金
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-700 font-serif leading-relaxed mb-3">
+                  重金购抄邻国珍藏的兵家古籍重作秘宝。购得手抄卷《太公阴符经》，主公<b>智力+3、统帅+2</b>。
+                </p>
+              </div>
+              <button
+                onClick={tradeBook}
+                disabled={activeRelation < 15}
+                className="w-full bg-amber-800 hover:bg-amber-900 disabled:bg-stone-200 disabled:text-stone-400 disabled:border-stone-300 text-white font-serif font-bold text-xs py-2 px-3 border border-amber-950 transition-colors cursor-pointer"
+              >
+                {activeRelation < 15 ? "交情未至秘籍不作互市 (需>=15响)" : "互市质购奇书秘卷"}
+              </button>
+            </div>
+
+            {/* Trade 3: Steed */}
+            <div className="bg-amber-50/50 border border-amber-800/20 p-3.5 rounded-none flex flex-col justify-between shadow-sm">
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <h4 className="font-serif font-black text-sm text-amber-950 flex gap-1 items-center">
+                    🐎 寻良宝马坐骑
+                  </h4>
+                  <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-700/20 px-1.5 py-0.5 font-bold">
+                    🌾 450 黄金
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-700 font-serif leading-relaxed mb-3">
+                  引进采购其西域汗血等大帅战马。主公获取专属优异座驾，<b>武力+3、朝野声望大涨 +50</b>点！
+                </p>
+              </div>
+              <button
+                onClick={tradeSteed}
+                disabled={activeRelation < 25}
+                className="w-full bg-amber-800 hover:bg-amber-900 disabled:bg-stone-200 disabled:text-stone-400 disabled:border-stone-300 text-white font-serif font-bold text-xs py-2 px-3 border border-amber-950 transition-colors cursor-pointer"
+              >
+                {activeRelation < 25 ? "缺乏盟约诚意不售名骏 (需>=25响)" : "互市引购西域神驹"}
+              </button>
+            </div>
+
+            {/* Trade 4: Silk */}
+            <div className="bg-amber-50/50 border border-amber-800/20 p-3.5 rounded-none flex flex-col justify-between shadow-sm">
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <h4 className="font-serif font-black text-sm text-amber-950 flex gap-1 items-center">
+                    绢 采办大宗丝帛
+                  </h4>
+                  <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-700/20 px-1.5 py-0.5 font-bold">
+                    🌾 150 黄金
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-700 font-serif leading-relaxed mb-3">
+                  购下其江东等大宗优质织锦礼恤百姓名绅。<b>民心 (民声) +5，朝野声望高唱 +80</b>点。
+                </p>
+              </div>
+              <button
+                onClick={tradeSilk}
+                disabled={activeRelation < 10}
+                className="w-full bg-amber-800 hover:bg-amber-900 disabled:bg-stone-200 disabled:text-stone-400 disabled:border-stone-300 text-white font-serif font-bold text-xs py-2 px-3 border border-amber-950 transition-colors cursor-pointer"
+              >
+                {activeRelation < 10 ? "商关未平谢绝采买大绢 (需>=10响)" : "通关采办江东绢帛"}
               </button>
             </div>
           </div>

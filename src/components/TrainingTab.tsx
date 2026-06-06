@@ -11,6 +11,8 @@ import { motion } from 'motion/react';
 interface TrainingTabProps {
   playerStats: PlayerStats;
   setPlayerStats: React.Dispatch<React.SetStateAction<PlayerStats>>;
+  activeStance: 'BALANCED' | 'OFFENSIVE' | 'DEFENSIVE';
+  setActiveStance: React.Dispatch<React.SetStateAction<'BALANCED' | 'OFFENSIVE' | 'DEFENSIVE'>>;
   onAddBattleLog: (msg: string, type: 'action' | 'casualty' | 'gain' | 'random_event') => void;
   showToast: (msg: string) => void;
   playDrum: () => void;
@@ -20,6 +22,8 @@ interface TrainingTabProps {
 export default function TrainingTab({
   playerStats,
   setPlayerStats,
+  activeStance,
+  setActiveStance,
   onAddBattleLog,
   showToast,
   playDrum,
@@ -28,6 +32,119 @@ export default function TrainingTab({
   const [drillLog, setDrillLog] = useState<string[]>([]);
   const [trainingStreak, setTrainingStreak] = useState<number>(0);
   const [focusGoal, setFocusGoal] = useState<'force' | 'intelligence' | 'leadership'>('force');
+
+  // Sandtable Battle Tactical Simulation Interactive States
+  const [simState, setSimState] = useState<'IDLE' | 'SIMULATING' | 'FINISHED'>('IDLE');
+  const [simProgress, setSimProgress] = useState<number>(0);
+  const [playerForceHp, setPlayerForceHp] = useState<number>(1000);
+  const [enemyForceHp, setEnemyForceHp] = useState<number>(1000);
+  const [simLogs, setSimLogs] = useState<string[]>([]);
+  const [hitTarget, setHitTarget] = useState<'player' | 'enemy' | null>(null);
+  const [floatingText, setFloatingText] = useState<{ text: string; isPlayer: boolean } | null>(null);
+
+  const runTacticalSimulation = () => {
+    if (simState === 'SIMULATING') return;
+    playDrum();
+    setSimState('SIMULATING');
+    setSimProgress(0);
+    setPlayerForceHp(1000);
+    setEnemyForceHp(1000);
+    setSimLogs([`🚩 推演启程：天下局势在野。当前阵营大印：【${activeStance === 'OFFENSIVE' ? '锋矢阵·攻势' : activeStance === 'DEFENSIVE' ? '鹤翼阵·守势' : '方圆阵·均衡' }】。两校勇士即刻亮剑接敌！`]);
+
+    let step = 0;
+    const interval = setInterval(() => {
+      step += 1;
+      const progressValue = step * 20; // 5 steps total
+      setSimProgress(progressValue);
+
+      if (step === 1) {
+        if (activeStance === 'OFFENSIVE') {
+          setSimLogs(prev => [...prev, "⚔️ 【战役拉开】锋矢强攻！我军突骑长枪贯透敌先锋防区 (-180 敌卒)！"]);
+          setEnemyForceHp(prev => Math.max(0, prev - 180));
+          setHitTarget('enemy');
+          setFloatingText({ text: "💥 -180 敌兵", isPlayer: false });
+        } else if (activeStance === 'DEFENSIVE') {
+          setSimLogs(prev => [...prev, "🛡️ 【战役拉开】鹤翼两门齐张！我军巨盾严阵固防，敌矢打击尽数化于盾墙。我属零伤亡！"]);
+          setHitTarget(null);
+          setFloatingText(null);
+        } else {
+          setSimLogs(prev => [...prev, "⚖️ 【战役拉开】方圆之阵稳当。主力部属缓缓向前，平推攻心，中正接招。"]);
+          setEnemyForceHp(prev => Math.max(0, prev - 80));
+          setPlayerForceHp(prev => Math.max(0, prev - 40));
+          setHitTarget('enemy');
+          setFloatingText({ text: "⚔️ -80 敌卒 / -40 本兵", isPlayer: false });
+        }
+      } else if (step === 2) {
+        if (activeStance === 'OFFENSIVE') {
+          setSimLogs(prev => [...prev, "🏹 【突击代价】敌营万张劲弩乱射！因我军锋失追求突刺，防线拉直暴露，折损 -220 精步兵！"]);
+          setPlayerForceHp(prev => Math.max(0, prev - 220));
+          setHitTarget('player');
+          setFloatingText({ text: "🏹 -220 兵卒", isPlayer: true });
+        } else if (activeStance === 'DEFENSIVE') {
+          setSimLogs(prev => [...prev, "🛡️ 【固若铠城】敌突袭纵队撞入重铠防线，大盾阻断巨烈冲杀！我军仅受极其细微震伤 (-30 守卒)。"]);
+          setPlayerForceHp(prev => Math.max(0, prev - 30));
+          setHitTarget('player');
+          setFloatingText({ text: "-30 盾化", isPlayer: true });
+        } else {
+          setSimLogs(prev => [...prev, "⚔️ 【白刃接战】死力撕扯！短刀肉搏撞击，阵前火花漫溢，两翼交刃死战。"]);
+          setEnemyForceHp(prev => Math.max(0, prev - 110));
+          setPlayerForceHp(prev => Math.max(0, prev - 80));
+          setHitTarget('enemy');
+          setFloatingText({ text: "-110 敌 / -80 我", isPlayer: false });
+        }
+      } else if (step === 3) {
+        if (activeStance === 'OFFENSIVE') {
+          setSimLogs(prev => [...prev, "🔥 【破防刺胆】帅纛砍断！我攻坚尖兵长驱直入敌中军，生擒折杀敌裨将 (-380 敌骁卒)！敌营陷入狂恐。"]);
+          setEnemyForceHp(prev => Math.max(0, prev - 380));
+          setHitTarget('enemy');
+          setFloatingText({ text: "💥💥 -380 敌溃败", isPlayer: false });
+        } else if (activeStance === 'DEFENSIVE') {
+          setSimLogs(prev => [...prev, "🏹 【两翼夹射】长弓齐拉！鹤翼合拢大剪围猎，两侧射死敌方绕袭轻骑 (-260 敌甲)！"]);
+          setEnemyForceHp(prev => Math.max(0, prev - 260));
+          setHitTarget('enemy');
+          setFloatingText({ text: "🏹 -260 夹死", isPlayer: false });
+        } else {
+          setSimLogs(prev => [...prev, "⚔️ 【阵法绞杀】攻守相辅。全营紧凑，借高统帅战术，徐徐压制敌游击马队 (-150 敌精)。"]);
+          setEnemyForceHp(prev => Math.max(0, prev - 150));
+          setPlayerForceHp(prev => Math.max(0, prev - 90));
+          setHitTarget('enemy');
+          setFloatingText({ text: "-150 敌 / -90我", isPlayer: false });
+        }
+      } else if (step === 4) {
+        if (activeStance === 'OFFENSIVE') {
+          setSimLogs(prev => [...prev, "⚔️ 【舍命相搏】敌军在绝境下发动绝命互斩！我前军锋矢彻底碎裂，陷于浴血绝杀 (-160 兵员)。"]);
+          setPlayerForceHp(prev => Math.max(0, prev - 160));
+          setHitTarget('player');
+          setFloatingText({ text: "-160 绝命肉搏", isPlayer: true });
+        } else if (activeStance === 'DEFENSIVE') {
+          setSimLogs(prev => [...prev, "🛡️ 【滴水不漏】坚收待平。鹤翼缩合为满地刺猬刺林。箭簇打地，固防毫发未伤 (-40 伤亡)。"]);
+          setPlayerForceHp(prev => Math.max(0, prev - 40));
+          setHitTarget('player');
+          setFloatingText({ text: "-40 守卒", isPlayer: true });
+        } else {
+          setSimLogs(prev => [...prev, "⚖️ 【鸣金徐退】方国圆阵左右有序掩护，两连将士平稳合阵，缓缓退还中军营地。"]);
+          setHitTarget(null);
+          setFloatingText(null);
+        }
+      } else if (step === 5) {
+        clearInterval(interval);
+        setSimState('FINISHED');
+        setHitTarget(null);
+        setFloatingText(null);
+
+        let evalResult = "";
+        if (activeStance === 'OFFENSIVE') {
+          evalResult = "🎉 【推演完结】锋矢一往无前：敌营总伤亡爆红达 -670，但我军突锋折损亦较高达 -380。此阵极契合敌弱我强，雷霆歼灭！";
+        } else if (activeStance === 'DEFENSIVE') {
+          evalResult = "🎉 【推演完结】鹤翼羽遮大安：阻守战成效惊艳，敌死伤 -260，我部盾墙防弹：损折仅 -70！宜用在危局劣势求存保种！";
+        } else {
+          evalResult = "🎉 【推演完结】方圆攻御和润：中正持久，累计破敌 -340，我部损挫 -210。应变周到，不畏伏兵暗袭。";
+        }
+        setSimLogs(prev => [...prev, evalResult]);
+        showToast("📈 【沙盘中演】校场阵法交锋演练大捷！两军本纪已备案！");
+      }
+    }, 800);
+  };
 
   // Tracking stats increment animation triggers
   const [prevForce, setPrevForce] = useState<number>(playerStats.force);
@@ -261,6 +378,301 @@ export default function TrainingTab({
           <BedDouble className="w-4 h-4" />
           {trainingStreak >= 3 ? '💤 【宣诏歇息一宵】(解脱过度疲劳)' : '💤 休假放松 (进退时序1日)'}
         </motion.button>
+      </div>
+
+      {/* Battle Formation Selector */}
+      <div className="bg-[#f2e6d0]/60 border-2 border-artistic-charcoal/80 p-5 rounded-none flex flex-col gap-4 text-left">
+        <div className="border-b border-[#3d3228]/25 pb-2">
+          <h3 className="font-serif font-black text-sm text-artistic-charcoal flex items-center gap-1.5">
+            💂‍♂️ 孙子兵法：行军中军大阵印契 (Active Battle Formation & Troop Stance)
+          </h3>
+          <p className="text-[11px] text-stone-600 font-serif leading-relaxed mt-1">
+            “兵无常势，水无常形。” 在此调配部骑三军大营阵姿。调换印契阵法将直接影响后续<b>剧情大战精骑生还存活率</b>、<b>内政策划岁效赋税征收额</b>、以及<b>奇遇试炼武略判定</b>：
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Stance 1: Balanced */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveStance('BALANCED');
+              playDrum();
+              showToast("⚔️ 阵法已变换为「方圆阵·均衡势」！三军攻防齐备，行军安和。");
+            }}
+            className={`p-3.5 border-2 flex flex-col justify-between text-left cursor-pointer transition-all ${
+              activeStance === 'BALANCED'
+                ? 'border-artistic-crimson bg-[#5c0f11]/5 shadow-xs'
+                : 'border-artistic-charcoal/30 bg-[#fbf9f4] hover:bg-stone-100'
+            }`}
+          >
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="font-serif font-black text-[12.5px] text-stone-900">🛡️ 方圆阵 (均衡势)</span>
+                {activeStance === 'BALANCED' && <span className="text-[9px] bg-artistic-crimson text-white px-1.5 py-0.5 font-bold font-serif animate-pulse">当前大印</span>}
+              </div>
+              <p className="text-[10px] text-stone-600 font-serif leading-relaxed mb-2">
+                行兵持重，两营中立。阴阳互表，攻防平稳。
+              </p>
+            </div>
+            <div className="border-t border-stone-200/50 pt-2 mt-2 text-[9.5px] font-mono font-bold text-stone-500 font-serif">
+              🛡️ 三军兵损：恒定 100%<br />
+              🌾 税赋解漕：恒定 100%
+            </div>
+          </button>
+
+          {/* Stance 2: Offensive */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveStance('OFFENSIVE');
+              playDrum();
+              showToast("🏹 阵法已变换为「锋矢阵·攻势」！刃口尖出，奇遇武功突战威力暴增！");
+            }}
+            className={`p-3.5 border-2 flex flex-col justify-between text-left cursor-pointer transition-all ${
+              activeStance === 'OFFENSIVE'
+                ? 'border-amber-700 bg-amber-500/5 shadow-xs'
+                : 'border-artistic-charcoal/30 bg-[#fbf9f4] hover:bg-stone-100'
+            }`}
+          >
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="font-serif font-black text-[12.5px] text-stone-900">🏹 锋矢阵 (攻势)</span>
+                {activeStance === 'OFFENSIVE' && <span className="text-[9px] bg-amber-700 text-white px-1.5 py-0.5 font-bold font-serif">当前大印</span>}
+              </div>
+              <p className="text-[10px] text-stone-600 font-serif leading-relaxed mb-2">
+                突阵尖刀，三军向前。一鼓作气，刺斩万军。
+              </p>
+            </div>
+            <div className="border-t border-stone-200/50 pt-2 mt-2 text-[9.5px] font-mono font-bold text-amber-800 font-serif">
+              💪 边疆奇遇：武艺考核 +15 点 ⚔️<br />
+              🔥 剧情兵损：额外增加 +15% 兵损
+            </div>
+          </button>
+
+          {/* Stance 3: Defensive */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveStance('DEFENSIVE');
+              playDrum();
+              showToast("🦅 阵法已变换为「鹤翼阵·守势」！重铠壁合，防风稳合，大幅提高守卒在大役中的生存率！");
+            }}
+            className={`p-3.5 border-2 flex flex-col justify-between text-left cursor-pointer transition-all ${
+              activeStance === 'DEFENSIVE'
+                ? 'border-emerald-700 bg-emerald-500/5 shadow-xs'
+                : 'border-artistic-charcoal/30 bg-[#fbf9f4] hover:bg-stone-100'
+            }`}
+          >
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="font-serif font-black text-[12.5px] text-stone-900">🦅 鹤翼阵 (守势)</span>
+                {activeStance === 'DEFENSIVE' && <span className="text-[9px] bg-emerald-700 text-white px-1.5 py-0.5 font-bold font-serif animate-pulse">当前大印</span>}
+              </div>
+              <p className="text-[10px] text-stone-600 font-serif leading-relaxed mb-2">
+                两翼齐护，盾堡如城。安然持守，退保不折兵卒。
+              </p>
+            </div>
+            <div className="border-t border-stone-200/50 pt-2 mt-2 text-[9.5px] font-mono font-bold text-emerald-800 font-serif">
+              ❤️ 剧情大役：兵损豁免 -30% 🛡️<br />
+              🌾 税赋解钞：各地折损少解 -25%
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* Dynamic Battle Tactical Sandtable Simulation with Troop Strike Feedback */}
+      <div className="border-4 border-artistic-charcoal bg-[#ebd9bc]/40 p-4 rounded-none relative text-left">
+        <div className="absolute top-2 right-2 text-stone-400 opacity-20 pointer-events-none text-4xl">
+          🎪
+        </div>
+        
+        <div className="border-b border-[#3d3228]/25 pb-2 mb-4 flex justify-between items-center flex-wrap gap-2">
+          <div>
+            <h3 className="font-serif font-black text-[13.5px] text-[#5c0f11] flex items-center gap-1.5">
+              🎪 军机阵眼大演习 (沙盘战阵拟合模拟与部位打击反馈)
+            </h3>
+            <p className="text-[10px] text-stone-600 font-serif leading-relaxed mt-0.5">
+              将当前大印阵形 <b>{activeStance === 'OFFENSIVE' ? '【锋矢阵·攻势】' : activeStance === 'DEFENSIVE' ? '【鹤翼阵·守势】' : '【方圆阵·均衡】'}</b> 融入沙盘，与凉州叛胡劲骑推演阵法绞杀，观照受敌打击反馈及生存效能：
+            </p>
+          </div>
+          
+          <button
+            type="button"
+            onClick={runTacticalSimulation}
+            disabled={simState === 'SIMULATING'}
+            className={`font-serif font-black text-xs py-1.5 px-3.5 rounded-none shadow-sm transition-all cursor-pointer border ${
+              simState === 'SIMULATING'
+                ? 'bg-stone-300 text-stone-500 border-stone-400 cursor-not-allowed'
+                : 'bg-artistic-crimson hover:bg-red-800 text-white border-stone-900'
+            }`}
+          >
+            {simState === 'SIMULATING' ? '⚡ 推算兵旗演击中...' : '⚔️ 启动战前演武推演 (沙盘模拟/打击魂)'}
+          </button>
+        </div>
+
+        {/* Visual Sandtable Arena */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center bg-[#fcf8f2] border-2 border-artistic-charcoal p-4 rounded-none relative overflow-hidden">
+          
+          {/* Left Unit: 我军营垒 (Player) */}
+          <div className="flex flex-col items-center p-3 border border-stone-250 bg-white relative h-full justify-between">
+            <motion.div 
+              className="text-center w-full"
+              animate={hitTarget === 'player' ? {
+                x: [-12, 12, -8, 8, -4, 4, 0],
+                rotate: [-2, 2, -1, 1, 0],
+                backgroundColor: ["#ffffff", "#fecaca", "#ffffff"]
+              } : {}}
+              transition={{ duration: 0.5 }}
+            >
+              <div className="w-12 h-12 bg-blue-100 rounded-full border-2 border-blue-800 flex items-center justify-center font-serif text-2xl mx-auto shadow-sm select-none">
+                💂‍♂️
+              </div>
+              <h4 className="font-serif font-black text-xs text-stone-900 mt-2">
+                我大营护军营
+              </h4>
+              <span className="text-[9.5px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-none font-bold border border-blue-200 mt-1 inline-block font-serif">
+                【{activeStance === 'OFFENSIVE' ? '锋矢攻' : activeStance === 'DEFENSIVE' ? '鹤翼守' : '方圆御'}】
+              </span>
+            </motion.div>
+
+            {/* HP Bar */}
+            <div className="w-full mt-3">
+              <div className="flex justify-between text-[9px] font-mono text-stone-500 mb-0.5">
+                <span>推拟存活战力</span>
+                <span className="font-bold">{playerForceHp}/1000</span>
+              </div>
+              <div className="w-full bg-stone-100 h-2 border border-stone-300 relative overflow-hidden rounded-none">
+                <div 
+                  className="h-full bg-blue-600 transition-all duration-300"
+                  style={{ width: `${(playerForceHp / 1000) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Floating Damage Number */}
+            {floatingText && floatingText.isPlayer && (
+              <motion.div
+                initial={{ opacity: 0, y: 15, scale: 0.6 }}
+                animate={{ opacity: [1, 1, 0], y: -35, scale: [1, 1.4, 1.1] }}
+                transition={{ duration: 1.1 }}
+                className="absolute font-mono font-black text-red-600 text-xs drop-shadow-[0_2px_4px_rgba(220,38,38,0.25)] pointer-events-none z-15"
+                style={{ top: '35%', left: '35%' }}
+              >
+                {floatingText.text}
+              </motion.div>
+            )}
+          </div>
+
+          {/* Center Column: Combat simulation progress & strike actions */}
+          <div className="flex flex-col items-center justify-center py-4 bg-stone-50/75 p-2.5 border-x border-dashed border-stone-300 h-full">
+            <span className="text-[10px] text-stone-500 tracking-widest font-mono uppercase bg-stone-200 px-2 py-0.5 font-bold">
+              {simState === 'IDLE' ? '参军待命 · 沙盘未启' : simState === 'SIMULATING' ? '⚔️ 乱斗推进中 ⚔️' : '📜 推演功成'}
+            </span>
+            
+            {/* Simulation Progress bar */}
+            <div className="w-full max-w-[170px] bg-stone-150 h-3.5 border border-stone-400 rounded-none overflow-hidden relative mt-2.5 flex items-center">
+              <div 
+                className="h-full bg-amber-600 transition-all duration-300 ease-out"
+                style={{ width: `${simProgress}%` }}
+              ></div>
+              <span className="absolute right-1.5 text-[8px] font-mono font-black text-stone-800">
+                {simProgress}%
+              </span>
+            </div>
+
+            {simState === 'SIMULATING' && (
+              <div className="text-[9.5px] font-serif text-amber-900 mt-2 flex items-center gap-1 animate-pulse">
+                <span>天将推算段位: 第 {simProgress / 20}/5 战阵合击</span>
+              </div>
+            )}
+
+            {simState === 'FINISHED' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSimState('IDLE');
+                  setSimProgress(0);
+                  setPlayerForceHp(1000);
+                  setEnemyForceHp(1000);
+                  setSimLogs([]);
+                }}
+                className="mt-3 text-[10px] font-serif font-black underline text-red-800 hover:text-red-700 cursor-pointer"
+              >
+                🔄 重新拟定大盘 (重算战况)
+              </button>
+            )}
+          </div>
+
+          {/* Right Unit: 敌统万户敌部 (Enemy) */}
+          <div className="flex flex-col items-center p-3 border border-stone-250 bg-white relative h-full justify-between">
+            <motion.div 
+              className="text-center w-full"
+              animate={hitTarget === 'enemy' ? {
+                x: [-12, 12, -8, 8, -4, 4, 0],
+                rotate: [-2, 2, -1, 1, 0],
+                backgroundColor: ["#ffffff", "#fecaca", "#ffffff"]
+              } : {}}
+              transition={{ duration: 0.5 }}
+            >
+              <div className="w-12 h-12 bg-red-100 rounded-full border-2 border-red-800 flex items-center justify-center font-serif text-2xl mx-auto shadow-sm select-none">
+                👹
+              </div>
+              <h4 className="font-serif font-black text-xs text-stone-900 mt-2">
+                凉州叛胡劲敌营
+              </h4>
+              <span className="text-[9.5px] bg-red-50 text-red-700 px-1.5 py-0.5 rounded-none font-bold border border-red-200 mt-1 inline-block font-serif">
+                【长蛇合击蛮势】
+              </span>
+            </motion.div>
+
+            {/* HP Bar */}
+            <div className="w-full mt-3">
+              <div className="flex justify-between text-[9px] font-mono text-stone-500 mb-0.5">
+                <span>叛贼估算战力</span>
+                <span className="font-bold">{enemyForceHp}/1000</span>
+              </div>
+              <div className="w-full bg-stone-100 h-2 border border-stone-300 relative overflow-hidden rounded-none">
+                <div 
+                  className="h-full bg-red-600 transition-all duration-300"
+                  style={{ width: `${(enemyForceHp / 1000) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Floating Damage Number */}
+            {floatingText && !floatingText.isPlayer && (
+              <motion.div
+                initial={{ opacity: 0, y: 15, scale: 0.6 }}
+                animate={{ opacity: [1, 1, 0], y: -35, scale: [1, 1.4, 1.1] }}
+                transition={{ duration: 1.1 }}
+                className="absolute font-mono font-black text-red-600 text-xs drop-shadow-[0_2px_4px_rgba(220,38,38,0.25)] pointer-events-none z-15"
+                style={{ top: '35%', left: '35%' }}
+              >
+                {floatingText.text}
+              </motion.div>
+            )}
+          </div>
+
+        </div>
+
+        {/* Sandtable Process Log lists */}
+        {simLogs.length > 0 && (
+          <div className="mt-3 bg-[#f6f0e4] border border-stone-300/60 p-2.5 max-h-[140px] overflow-y-auto font-serif text-[10.5px] space-y-1.5 scrollbar-ink">
+            {simLogs.map((log, lIdx) => (
+              <div 
+                key={lIdx} 
+                className={`${
+                  lIdx === simLogs.length - 1 
+                    ? 'font-bold text-[#5c0f11] bg-amber-100/50 p-1.5 border-l-2 border-amber-800' 
+                    : 'text-stone-700 border-b border-stone-200/50 pb-1'
+                } leading-relaxed`}
+              >
+                {log}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Preset target priorities selector dropdown */}

@@ -61,6 +61,30 @@ export const GAME_CHAPTERS: Chapter[] = [
     period: '公元226年 - 280年',
     startSceneId: 'c7_1',
     desc: '乱世百年，百骨露野。司马氏江山代换，天下一统狂潮不可阻挡。天道轮回，一洗悲歌，终结百载战乱！'
+  },
+  {
+    id: 'c8',
+    num: '第八章',
+    title: '虎牢关前，三英战吕布',
+    period: '公元190年',
+    startSceneId: 'c8_start',
+    desc: '董卓乱京，十八路诸侯并起讨董。神将吕布跃马拉弓阻于关下，刘关张冲天豪气，虎牢关前谱写盖世侠义千古绝唱！'
+  },
+  {
+    id: 'c9',
+    num: '第九章',
+    title: '青梅置酒，煮酒论英雄',
+    period: '公元199年',
+    startSceneId: 'c9_start',
+    desc: '寄人篱下，韬光养晦于菜园。曹操突召置酒，谈笑天下评点乾坤。金蝉脱壳逃脱龙潭，命运由你决裁！'
+  },
+  {
+    id: 'c10',
+    num: '第十章',
+    title: '挂印封金，千里走单骑',
+    period: '公元200年',
+    startSceneId: 'c10_start',
+    desc: '徐州战败弟兄离散，云长封金挂印，保皇嫂千里寻兄。神挡杀神过五关斩六将，忠义赤胆万世流传！'
   }
 ];
 
@@ -1216,5 +1240,230 @@ export const GAME_SCENES: Record<string, StoryScene> = {
     narration: '大势崩溃，如山崩地坼！你的势力由于中营精锐兵卒一扫而光，在此军阀交锋、流寇肆虐的严苛岁月中迅速成了任人染指宰割之餐。部将或溃走投诚，或身死阵前，而溃散败军與乱民也趁火打劫冲入帅帐。你拔剑回望烟火熏天，长叹一声倒于沙场！终归没能打破历史的绝情牢笼。主公，您已兵败身死！',
     historicalFact: '惨痛教训！中营兵卒兵力减少至 0 而触发强制败局。在这烽烟未平的东汉末年，兵权即是一切话语权的磐石。请在日后经营、攻防和奇遇试炼中极力关注库存兵力，厉兵秣马！',
     options: []
+  },
+
+  // ------------ CHAPTER 8: THREE HEROES FIGHT LU BU ------------
+  'c8_start': {
+    id: 'c8_start',
+    chapterId: 'c8',
+    title: '雄关阻路，神将盘横',
+    year: 190,
+    narration: '公元190年，十八路诸侯歃血为盟直插中原，却被温侯吕布一匹赤兔马、一杆方天画戟阻于虎牢关前。盟军折将折锐，公孙瓒险丧马前。两军阵前风沙起，温侯傲视万军，狂嗷：“谁敢再上受死！”关公横刀，张飞勒矛。面临这场天下第一神威宿缘交锋，主公欲作何裁断？',
+    historicalFact: '《三国演义》经典名场面。虎牢关前三英激战吕布，让刘备军三人首次在天下诸侯前大显神威，书写了桃园结义的忠武华章。',
+    options: [
+      {
+        id: 'c8_s_opt1',
+        text: '【派遣三英】燕人张翼德挺丈八蛇矛横扫而出，关云长舞偃月刀、主公仗双股剑全伙围攻！',
+        effect: {
+          statChanges: { prestige: 180, virtue: 20 },
+          customLog: '震撼苍穹之战！张飞厉喝一声率先冲入敌阵，如怒雷震裂冰层，枪尖颤击将赤兔马连阻数步。关云长青龙寒光如泼水泼出，主公共舞雌雄剑呈三叠合击。吕布纵能飞天走地，亦被合围逼得披发败北！虎牢关前千古第一杀，全军爆彩喝阵！'
+        },
+        nextSceneId: 'c8_victory'
+      },
+      {
+        id: 'c8_s_opt2',
+        text: '【铁桶战术】调重甲刀盾，遣军千人箭羽齐发，用纯重兵阵法和消耗挫其锐气！',
+        effect: {
+          statChanges: { troops: -350, prestige: 80, deviance: 10 },
+          customLog: '重围之势！你无视单骑名号，直接号令五百中军悍卒与密箭流星夹攻温侯。吕布即便神威惊宇，也敌不过千军严壁，只能咬牙怒啸斩杀偏将后落荒遁投关。虽折损兵力，但终究拔除了杀阵！'
+        },
+        nextSceneId: 'c8_victory'
+      },
+      {
+        id: 'c8_s_opt3',
+        text: '【龟缩免战】战局不可测，暂高挂免战牌，保留兵卒实力任诸侯叫战。',
+        effect: {
+          statChanges: { prestige: -40, virtue: -10 },
+          customLog: '诸侯皆露怯！袁绍长叹“若我颜良文丑在，何至于此！”。然而盟军内部分离，随着数日后火烧洛阳的消息传来，十八路讨董诸侯就此自私作罢、不战而散，青史留憾。'
+        },
+        nextSceneId: 'c8_draw'
+      }
+    ]
+  },
+  'c8_victory': {
+    id: 'c8_victory',
+    chapterId: 'c8',
+    title: '名震中原，威震联军',
+    year: 190,
+    narration: '吕布落荒奔回雄关紧闭。诸侯公孙瓒、曹操大加宴赐，众人满斟黄金贺酒。中原联军上下，无人不叹服主公帐前之大勇。此次打破温侯不败金身神迹，你的名望和实力在极高天鉴上开始改写东汉割据宿世格局！',
+    historicalFact: '虎牢关一捷是主角自此迈入一流权争之阶的重磅跳板，历史对这一大捷赋予了极其丰厚的评价分值。',
+    options: [
+      {
+        id: 'c8_v_opt1',
+        text: '【受勋班师】收复虎牢残散步卒，携带大宗诸侯犒劳黄金班师回大本营！',
+        effect: {
+          statChanges: { gold: 1200, troops: 500, prestige: 100 }
+        },
+        nextSceneId: 'ending_emperor'
+      }
+    ]
+  },
+  'c8_draw': {
+    id: 'c8_draw',
+    chapterId: 'c8',
+    title: '落寞退场，历史重写',
+    year: 190,
+    narration: '由于过于求全保守，虎牢无所建树。董卓得胜从容迁都长安并纵火焚掠洛阳。各路诸侯在猜忌中纷纷自退，中原再度陷入了你争我夺、赤地千里的漫长荒芜乱纪。',
+    historicalFact: '无功即过。错失战机导致中原错走上了分裂、民生涂炭的漫长乱纪世道。',
+    options: [
+      {
+        id: 'c8_d_opt1',
+        text: '【叹作休止】收拾退意，退归故地卧薪尝胆，精修内政。',
+        effect: {
+          statChanges: { prestige: -20, virtue: 10 }
+        },
+        nextSceneId: 'ending_historic'
+      }
+    ]
+  },
+
+  // ------------ CHAPTER 9: DISCUSSING HEROES OVER WINE ------------
+  'c9_start': {
+    id: 'c9_start',
+    chapterId: 'c9',
+    title: '后园藏锋，青梅亭会',
+    year: 199,
+    narration: '公元199年，幽燕战息。你身怀宏图，却暂羁留于曹操之许都。为避枭雄加害忌心，你每日于后园辟地种菜，挑粪灌溉，表现得全无大志。这日天际聚雨，曹操突然遣人召你。青梅亭上双雄对樽，操指点天下英雄。他逼视着你，突放惊天断语：“今天下英雄，唯使君与操耳！”此时春雷将起，风急云翻。主公如何破招？',
+    historicalFact: '“煮酒论英雄”是《三国演义》中玄德韬光避害、金蝉脱壳的最高谋略桥段，其以雷惊筷落地来化解枭雄毒刺，令百代赞慕。',
+    options: [
+      {
+        id: 'c9_s_opt1',
+        text: '【落箸掩雷】大惊失箸！假称自己受迅雷之威惊骇，巧妙退隐傲绝乾坤之才，麻痹曹公！',
+        effect: {
+          statChanges: { virtue: 35, deviance: -10, prestige: -15 },
+          customLog: '雷声大作！你巧妙掉落竹箸，顺水推舟：“雷威惊怖如斯，真大丈夫之畏天心。”曹孟德闻之狂笑不已，心底警惕瞬间荡为尘泥，视你为寻常庸君。数日后你成功借讨袁术之由调遣五万大军直趋徐州城！'
+        },
+        nextSceneId: 'c9_success'
+      },
+      {
+        id: 'c9_s_opt2',
+        text: '【当仁不让】挺直身姿！坦荡笑对曹操：“曹公所言极是！天下纷乱有志者，除备与明公，余者皆不足挂齿！”',
+        effect: {
+          statChanges: { deviance: 60, prestige: 250, virtue: -10 },
+          customLog: '雄豪相撞！曹操眼中杀意滔天，虽然大叹你有傲骨，但程昱等人连夜劝说：“备乃飞龙异象，此时不杀必为后患。”当晚府兵包围府苑，局势凶猛，主公不得不带着关羽张飞踏过重甲鲜血，死战破门出城！'
+        },
+        nextSceneId: 'c9_clash'
+      },
+      {
+        id: 'c9_s_opt3',
+        text: '【叩首甘伏】胡言阿谀！直接跪倒在曹公座前叩首称谢，表态终生愿作孟德帐下一犬马，不再自称刘氏宗室。',
+        effect: {
+          statChanges: { prestige: -80, virtue: -30, deviance: -20 },
+          customLog: '曹操虽然不再忌惮你，但眼神里的鄙夷显露无遗。你虽然逃脱杀身，但骨节意志皆碎，你被削夺了大名和随从并终生幽禁在深苑大墙里，郁郁而终。'
+        },
+        nextSceneId: 'c9_fail'
+      }
+    ]
+  },
+  'c9_success': {
+    id: 'c9_success',
+    chapterId: 'c9',
+    title: '龙腾九汉，纵兵脱围',
+    year: 199,
+    narration: '你以完美心术瞒过当时最绝枭雄，犹如蛟龙游入怒海汪洋，金蝉摆脱死结！关张接令高奏凯旋歌，你们领着带出的几万曹军精锐一鼓作气夺下重镇并扩充行营。龙魂复苏！',
+    historicalFact: '刘备借机脱离许都，从此蛟龙入海、天阔凭飞，是其创业立邦的一大奇迹改命里程碑。',
+    options: [
+      {
+        id: 'c9_suc_opt1',
+        text: '【一元复始】号召部众高筑防御，扩募集训各地兵数，筹集黄金司库。',
+        effect: {
+          statChanges: { gold: 1000, troops: 1800, prestige: 150 }
+        },
+        nextSceneId: 'ending_loyalist'
+      }
+    ]
+  },
+  'c9_clash': {
+    id: 'c9_clash',
+    chapterId: 'c9',
+    title: '破浪决算，徐州阻击',
+    year: 199,
+    narration: '你踩着无尽血骨杀出了许都，但徐州全面战端因此被无限提早！曹操亲统二十万倾国大军，挟天子之诏杀声滚滚重兵围守。徐州城墙残破，兵卒惊恐。主公必须在此绝壁之上拼至死路！',
+    historicalFact: '提前开局的大火并。虽然热血磅礴，然而也导致了极度残忍、艰难的攻城苦战和兵力减耗。',
+    options: [
+      {
+        id: 'c9_cl_opt1',
+        text: '【死守拒敌】用鲜血与怒火捍卫社稷，三军死不退步！',
+        effect: {
+          statChanges: { troops: -650, prestige: 200 }
+        },
+        nextSceneId: 'ending_historic'
+      }
+    ]
+  },
+  'c9_fail': {
+    id: 'c9_fail',
+    chapterId: 'c9',
+    title: '折骨残名，长落草芥',
+    year: 199,
+    narration: '大势溃尽。在欺侮和极度耻辱的禁闭中，你磨掉了所有的英卓之气。关公叹息挂印，张飞流野，汉室之天命，就此凄凉落地。',
+    historicalFact: '避祸而使骨志折断。豪杰一朝失胆，英雄从此不再入册。',
+    options: [
+      {
+        id: 'c9_f_opt1',
+        text: '【魂入悲流】一朝痛改前非，重渡宿命磨难。',
+        effect: {
+          statChanges: { deviance: -30 }
+        },
+        nextSceneId: 'ending_defeat'
+      }
+    ]
+  },
+
+  // ------------ CHAPTER 10: A THOUSAND MILES TO RIDE ------------
+  'c10_start': {
+    id: 'c10_start',
+    chapterId: 'c10',
+    title: '封金挂印，五关阻路',
+    year: 200,
+    narration: '公元200年，徐州离碎，关云长暂寄曹营。一朝听闻刘大耳朵仍生还于袁绍处，关公誓死不欺旧义。将曹操封赏大印高悬堂上、任留黄金，一车两轿保皇嫂千里叩行。东路五关：东岭关孔秀、洛阳韩福孟坦、汜水卞喜、荥阳王植、滑州秦琪。他们皆领守千余刀弓精兵，只因并无通关文牒要致二爷于死命。云长神目如电，提刀纵马，主公该指派如何协助？',
+    historicalFact: '“过五关斩六将”奠定了关羽“武圣”名号与其绝伦忠义风范，也是全演义之中气量、传奇和侠烈最高歌的画卷之一。',
+    options: [
+      {
+        id: 'c10_s_opt1',
+        text: '【斩将破关】遣赤兔赤烈如风，关公拖刀啸野，凭旷古神威一刀断碎关隘、神挡斩神！',
+        effect: {
+          statChanges: { prestige: 260, deviance: 35, troops: -180 },
+          customLog: '天地血色飞散！东岭关孔秀一合死绝；荥阳卞喜欲设暗刀被云长识破，大刀扫过人首坠井。黄河口秦琪不知深浅，口吐狂言，一合首级挂在赤兔辕旁！五关六将命断断不阻云长。忠义神武威势惊心动魄！'
+        },
+        nextSceneId: 'c10_success'
+      },
+      {
+        id: 'c10_s_opt2',
+        text: '【金牌过卡】调拨重千金走密线融通防关。私信张辽张文远，促成曹操颁发特护通关免死令牌。',
+        effect: {
+          statChanges: { gold: -500, virtue: 40, troops: 300 },
+          customLog: '太史金通！你利用无尽黄金在背后替云长秘密打点守将，加之曹操叹服云长忠烈而派出快马追赠‘出关金牌’。路途大减杀意血光，安然保全了护送的大部军马！'
+        },
+        nextSceneId: 'c10_success'
+      },
+      {
+        id: 'c10_s_opt3',
+        text: '【投桃留魏】关公被曹操三日大宴、十里赠袍、名姬骏马重礼彻底说服，归心留仕魏朝。',
+        effect: {
+          statChanges: { prestige: 350, deviance: 100, virtue: -100 },
+          customLog: '惊天破碎！关公在恩赏大情前决定重拜曹操为主。刘玄德在北方闻讯恸哭晕厥。桃园义气冰裂灰崩，大汉气数沦丧。天下大权由此被霸权彻底囊括归并。'
+        },
+        nextSceneId: 'ending_historic'
+      }
+    ]
+  },
+  'c10_success': {
+    id: 'c10_success',
+    chapterId: 'c10',
+    title: '古城大叙，袍泽重聚',
+    year: 200,
+    narration: '山高路长，古城之下尘土扬天。张翼德起初擂鼓欲试刀剑，然而当看到背道死拼护送的二嫂和斩下的魏关残将首级。三弟狂哭下跪搂肩，刘玄德轻马北来。桃园三豪杰于马前相拥而泣，周围战士万众流下滚热忠骨泪！兄弟复聚，天下共豪！',
+    historicalFact: '古城重聚后由于万民崇敬其大义，刘备军队战斗意志和民望扶摇九万里。',
+    options: [
+      {
+        id: 'c10_suc_opt1',
+        text: '【王业腾骧】桃园再大亮！整军齐呼，扩主营部卒精悍，厉兵秣马高歌再战！',
+        effect: {
+          statChanges: { gold: 1200, troops: 2000, prestige: 220 }
+        },
+        nextSceneId: 'ending_emperor'
+      }
+    ]
   }
 };

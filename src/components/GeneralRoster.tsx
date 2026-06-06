@@ -146,6 +146,110 @@ const DETAILED_BIOGRAPHIES: Record<string, { title: string; chapters: string[] }
   }
 };
 
+interface LegendAchievement {
+  legendTitle: string;
+  legendContent: string;
+  achievements: {
+    name: string;
+    key: string;
+    targetDesc: string;
+    formula: (g: General, isRecruited: boolean) => { progress: number; achieved: boolean };
+  }[];
+}
+
+const GENERAL_LEGENDS_ACHIEVEMENTS: Record<string, LegendAchievement> = {
+  liubei: {
+    legendTitle: '【双手过膝 & 髀肉复生】',
+    legendContent: '据正史《三国志·先主传》载，刘备双手过膝，顾自见其耳。寄于荆州刘表账下数年，一日入厕因见髀里肉生，流涕悲叹。叹息日月如流，老将至而功未立，大志不灭之姿跃然流光。',
+    achievements: [
+      { name: '大汉帝裔', key: 'recruit', targetDesc: '先主刘玄德归降并名列麾下 (已招募)', formula: (g, isRec) => ({ progress: isRec ? 100 : 0, achieved: isRec }) },
+      { name: '昭烈雄阶', key: 'level', targetDesc: '先主修行等级达到 LV.4 以上', formula: (g) => ({ progress: Math.min(100, Math.round((g.level / 4) * 100)), achieved: g.level >= 4 }) },
+      { name: '德服天下', key: 'virtue', targetDesc: '先主德行孕育提升到 85 点以上', formula: (g) => ({ progress: Math.min(100, Math.round((g.virtue / 85) * 100)), achieved: g.virtue >= 85 }) }
+    ]
+  },
+  guanyu: {
+    legendTitle: '【刮骨疗毒 & 单刀五关】',
+    legendContent: '云长曾于前线为毒矢所中，毒入右臂骨。神医切开皮肉刮骨沙沙有声，羽却饮酒弈棋，言笑自若！及后千里寻主，单刀赴江东鲁肃之会，大义凛然折服名士。',
+    achievements: [
+      { name: '云长归汉', key: 'recruit', targetDesc: '汉寿亭侯关云长听宣入幕 (已招募)', formula: (g, isRec) => ({ progress: isRec ? 100 : 0, achieved: isRec }) },
+      { name: '武圣狂澜', key: 'force', targetDesc: '关羽武力修行点数达到 100 点巅峰', formula: (g) => ({ progress: Math.min(100, Math.round((g.force / 100) * 100)), achieved: g.force >= 100 }) },
+      { name: '大信誓言', key: 'loyalty', targetDesc: '关羽对幕府忠诚度达到 100 满额', formula: (g) => ({ progress: Math.min(100, Math.round((g.loyalty / 100) * 100)), achieved: g.loyalty >= 100 }) }
+    ]
+  },
+  zhangfei: {
+    legendTitle: '【当阳断桥 & 义释严颜】',
+    legendContent: '长坡当阳，张翼德横矛立马于水桥，怒目大喝“我乃燕人张翼德”，曹营万马畏而退。平定巴蜀大郡时，设计擒拿白发严颜，被其宁死不降的气节打动，亲自解缚纳为上宾，亦粗有儒雅文墨之能。',
+    achievements: [
+      { name: '长坂横槊', key: 'recruit', targetDesc: '猛张飞入账听调共参政纪 (已招募)', formula: (g, isRec) => ({ progress: isRec ? 100 : 0, achieved: isRec }) },
+      { name: '铁面书墨', key: 'intel', targetDesc: '张翼德文华智力属性修行突破 84 点', formula: (g) => ({ progress: Math.min(100, Math.round((g.intelligence / 84) * 100)), achieved: g.intelligence >= 84 }) },
+      { name: '燕歌突振', key: 'level', targetDesc: '张翼德行军等阶达到 LV.4 以上', formula: (g) => ({ progress: Math.min(100, Math.round((g.level / 4) * 100)), achieved: g.level >= 4 }) }
+    ]
+  },
+  zhaoyun: {
+    legendTitle: '【七进七出 & 子龙一身胆】',
+    legendContent: '子龙于长坂乱线孤胆搜寻主母，突围夺得曹操宝剑，怀抱少主阿斗杀透重围，斩五十余将。先主摔子而泣，高呼：“子龙一身都是胆也！”一生行事大义，无愧真君子之风。',
+    achievements: [
+      { name: '常山神胆', key: 'recruit', targetDesc: '赵子龙战马白甲誓约效效忠 (已招募)', formula: (g, isRec) => ({ progress: isRec ? 100 : 0, achieved: isRec }) },
+      { name: '长枪白虹', key: 'force', targetDesc: '赵子龙武力历练值增至 98 点以上', formula: (g) => ({ progress: Math.min(100, Math.round((g.force / 98) * 100)), achieved: g.force >= 98 }) },
+      { name: '行军破千', key: 'level', targetDesc: '赵子龙督校修行等级达 LV.4 阶级', formula: (g) => ({ progress: Math.min(100, Math.round((g.level / 4) * 100)), achieved: g.level >= 4 }) }
+    ]
+  },
+  zhugeliang: {
+    legendTitle: '【借来东风 & 抚琴空城】',
+    legendContent: '孔明神机夺天机，筑七星台借来东南烈风，火焚八十万曹军！及后街亭有折，其弹琴城楼闲适作歌，司马十五万大军莫敢近窥，心多狐疑遂败退。鞠躬以死大汉社稷。',
+    achievements: [
+      { name: '草庐卧龙', key: 'recruit', targetDesc: '诸葛孔明躬亲辅翼王道 (已招募)', formula: (g, isRec) => ({ progress: isRec ? 100 : 0, achieved: isRec }) },
+      { name: '太极奇阵', key: 'intel', targetDesc: '孔明智谋点数达到极峰 100 点', formula: (g) => ({ progress: Math.min(100, Math.round((g.intelligence / 100) * 100)), achieved: g.intelligence >= 100 }) },
+      { name: '五丈灯继', key: 'level', targetDesc: '卧龙军师等阶修行达到 LV.4 绝位', formula: (g) => ({ progress: Math.min(100, Math.round((g.level / 4) * 100)), achieved: g.level >= 4 }) }
+    ]
+  },
+  taishici: {
+    legendTitle: '【大信义神射 & 龙虎神亭】',
+    legendContent: '太史子义于神亭岗决斗孙策。孙策夺得其手戟，其亦取去孙策兜鍪。北海之绝境，子义怀揣血信单马突射，弦不虚发。其神矢威行，能在极百步开外直接贯透关隘守卒之腕，真烈士也。',
+    achievements: [
+      { name: '东莱名义', key: 'recruit', targetDesc: '太史子义将军受拜入幕 (已招募)', formula: (g, isRec) => ({ progress: isRec ? 100 : 0, achieved: isRec }) },
+      { name: '流星坠月', key: 'force', targetDesc: '太史慈武力修为磨合暴涨至 95 点', formula: (g) => ({ progress: Math.min(100, Math.round((g.force / 95) * 100)), achieved: g.force >= 95 }) },
+      { name: '一言重千', key: 'loyalty', targetDesc: '太史慈忠心誓约提升达 100 满格', formula: (g) => ({ progress: Math.min(100, Math.round((g.loyalty / 100) * 100)), achieved: g.loyalty >= 100 }) }
+    ]
+  },
+  guojia: {
+    legendTitle: '【十胜十败 & 遗计斩袁】',
+    legendContent: '奉孝在官渡战前一气写下十德胜败之说，厘清宿愿胜败之机，大定曹魏士气。临川兵亡前料定大漠公孙定斩降逃袁尚而献其首，遗计不血刃底定河北，算尽乾坤。',
+    achievements: [
+      { name: '颍川谋首', key: 'recruit', targetDesc: '鬼才郭奉孝谋策加盟听封 (已招募)', formula: (g, isRec) => ({ progress: isRec ? 100 : 0, achieved: isRec }) },
+      { name: '妙理天干', key: 'intel', targetDesc: '郭嘉神测智力磨炼突破 99 大格', formula: (g) => ({ progress: Math.min(100, Math.round((g.intelligence / 99) * 100)), achieved: g.intelligence >= 99 }) },
+      { name: '参谋不老', key: 'level', targetDesc: '郭奉孝在校场等阶修养达成 LV.4', formula: (g) => ({ progress: Math.min(100, Math.round((g.level / 4) * 100)), achieved: g.level >= 4 }) }
+    ]
+  },
+  jiangwei: {
+    legendTitle: '【孤臣中纛 & 剖胆大如鸡】',
+    legendContent: '维嗣诸葛孔明未尽之业，单膝跪受帅纛，以一己孤军支撑西秦剑门天堑。蜀主称降大呼，伯约暗中设间，计反钟会，死前自刎，死后被刮剖，视之其“胆大如鸡子墨斗”，悲壮亘古未见。',
+    achievements: [
+      { name: '西凉麒麟', key: 'recruit', targetDesc: '姜伯约忠臣名列宿卫名册 (已招募)', formula: (g, isRec) => ({ progress: isRec ? 100 : 0, achieved: isRec }) },
+      { name: '文武继统', key: 'combined', targetDesc: '姜伯约武力、智略两项同修达 90+', formula: (g) => ({ progress: Math.min(100, Math.round(((g.force + g.intelligence) / 180) * 100)), achieved: g.force >= 90 && g.intelligence >= 90 }) },
+      { name: '剑关撑旗', key: 'level', targetDesc: '姜维修行等阶臻至 LV.4 以上', formula: (g) => ({ progress: Math.min(100, Math.round((g.level / 4) * 100)), achieved: g.level >= 4 }) }
+    ]
+  },
+  caocao: {
+    legendTitle: '【断发御兵 & 魏武横槊】',
+    legendContent: '曹操经麦田令：踏麦踩秧者斩，其座骑惊。执剑自裁下，谋臣力阻，操断己长发落于麦土，令代首示军，军法为之一振！举酒赤壁执铁槊横长天，一代英雄豪气。',
+    achievements: [
+      { name: '唯才是举', key: 'recruit', targetDesc: '曹操曹孟德霸道元帅列入幕府 (已招募)', formula: (g, isRec) => ({ progress: isRec ? 100 : 0, achieved: isRec }) },
+      { name: '霸业封神', key: 'politics', targetDesc: '曹操政治权谋修行极至 100 点级别', formula: (g) => ({ progress: Math.min(100, Math.round((g.politics / 100) * 100)), achieved: g.politics >= 100 }) },
+      { name: '魏武扬鞭', key: 'level', targetDesc: '曹操修行主公御下等阶到 LV.5', formula: (g) => ({ progress: Math.min(100, Math.round((g.level / 5) * 100)), achieved: g.level >= 5 }) }
+    ]
+  },
+  luxun: {
+    legendTitle: '【狂飙烈火夷陵 & 社稷柱国】',
+    legendContent: '逊儒雅如生书生，任东吴都督，上书极尽虚美示弱麻痹刘备，引蜀军林中扎营下。巧趁热暑之夏，手执火符风卷连营，两岸火海，社稷于危巢一朝全而固。',
+    achievements: [
+      { name: '社稷重臣', key: 'recruit', targetDesc: '儒将陆伯言入听调令列麾下 (已招募)', formula: (g, isRec) => ({ progress: isRec ? 100 : 0, achieved: isRec }) },
+      { name: '烈火八营', key: 'intel', targetDesc: '陆逊智策属性值研习达成 98 点', formula: (g) => ({ progress: Math.min(100, Math.round((g.intelligence / 98) * 100)), achieved: g.intelligence >= 98 }) },
+      { name: '出将入相', key: 'level', targetDesc: '陆都督修行等阶高晋至 LV.4 等级', formula: (g) => ({ progress: Math.min(100, Math.round((g.level / 4) * 100)), achieved: g.level >= 4 }) }
+    ]
+  }
+};
+
 export default function GeneralRoster({
   recruitedIds,
   playerStats,
@@ -1032,10 +1136,10 @@ export default function GeneralRoster({
       {/* DETAILED BIOGRAPHY PARCHMENT OVERLAY MODAL */}
       {showBioOverlay && displayGeneral && (
         <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#fcf8f2] border-4 border-artistic-charcoal max-w-xl w-full p-6 md:p-8 shadow-2xl relative animate-scale-up border-double max-h-[90vh] overflow-y-auto scrollbar-ink">
+          <div className="bg-[#fcf8f2] border-4 border-artistic-charcoal max-w-2xl w-full p-6 md:p-8 shadow-2xl relative animate-scale-up border-double max-h-[90vh] overflow-y-auto scrollbar-ink text-left">
             {/* Ink drop corner design */}
             <div className="absolute top-0 right-0 p-3 opacity-15 text-stone-700 pointer-events-none text-6xl font-serif">
-              🛡️
+              📜
             </div>
 
             <button
@@ -1055,24 +1159,107 @@ export default function GeneralRoster({
               </h3>
             </div>
 
-            <div className="space-y-4 text-stone-800 text-xs md:text-sm font-serif leading-relaxed mb-6">
-              {DETAILED_BIOGRAPHIES[displayGeneral.id] ? (
-                DETAILED_BIOGRAPHIES[displayGeneral.id].chapters.map((paragraph, pIdx) => (
-                  <p key={pIdx} className="indent-6 text-justify">
-                    {paragraph}
-                  </p>
-                ))
-              ) : (
-                <>
-                  <p className="indent-6 text-justify">
-                    【野纪生平】{displayGeneral.name}，字号生平如其名，在三国动乱史实中威扬名重。特有兵形战法：『{displayGeneral.skill}』。拥有极高战术潜力。
-                  </p>
-                  <p className="indent-6 text-justify">
-                    “{displayGeneral.biography}” 传记记载简约，但其行事克己忠义，能在校场及战策抉择中为主公力挽狂澜。
-                  </p>
-                </>
-              )}
+            {/* Part 1: Life Biography */}
+            <div className="mb-6">
+              <h4 className="font-serif font-black text-xs text-amber-950 bg-amber-100/60 border border-amber-800/20 py-1 px-2.5 mb-2.5 flex items-center gap-1">
+                📖 生平起居注 (Life Biography)
+              </h4>
+              <div className="space-y-3.5 text-stone-800 text-[12px] md:text-sm font-serif leading-relaxed">
+                {DETAILED_BIOGRAPHIES[displayGeneral.id] ? (
+                  DETAILED_BIOGRAPHIES[displayGeneral.id].chapters.map((paragraph, pIdx) => (
+                    <p key={pIdx} className="indent-6 text-justify">
+                      {paragraph}
+                    </p>
+                  ))
+                ) : (
+                  <>
+                    <p className="indent-6 text-justify">
+                      【野纪生平】{displayGeneral.name}，字号生平如其名，在三国动乱史实中威扬名重。特有兵形战法：『{displayGeneral.skill}』。拥有极高战术潜力。
+                    </p>
+                    <p className="indent-6 text-justify">
+                      “{displayGeneral.biography}” 传记记载简约，但其行事克己忠义，能在校场及战策抉择中为主公力挽狂澜。
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
+
+            {/* Part 2: Historical Legends (历史典故) */}
+            {(() => {
+              const la = GENERAL_LEGENDS_ACHIEVEMENTS[displayGeneral.id];
+              if (!la) return null;
+              return (
+                <div className="mb-6 bg-amber-50/50 border-y border-amber-900/30 p-3">
+                  <h4 className="font-serif font-black text-xs text-amber-900 mb-1.5 flex items-center gap-1">
+                    🌟 历史传世典故 (Legends & Tales)
+                  </h4>
+                  <span className="font-serif font-extrabold text-amber-950 text-xs block mb-1">
+                    {la.legendTitle}
+                  </span>
+                  <p className="text-stone-700 text-[11.5px] leading-relaxed font-serif italic indent-4">
+                    {la.legendContent}
+                  </p>
+                </div>
+              );
+            })()}
+
+            {/* Part 3: SSS Interactive Exclusive Achievements (专属成就进度) */}
+            {(() => {
+              const la = GENERAL_LEGENDS_ACHIEVEMENTS[displayGeneral.id];
+              if (!la) return null;
+              return (
+                <div className="mb-6 bg-stone-50 border border-stone-200 p-3.5 rounded-none">
+                  <h4 className="font-serif font-black text-xs text-stone-900 mb-2.5 flex items-center justify-between">
+                    <span>🏆 主公互动 · 专属将星成就进度 (Interactive Achievements)</span>
+                    <span className="text-[10px] text-stone-500 font-mono">
+                      (与玩家互动或督导等阶决定达成度)
+                    </span>
+                  </h4>
+                  <div className="space-y-3">
+                    {la.achievements.map((ach, idx) => {
+                      const statsInfo = ach.formula(displayGeneral, recruitedSet.has(displayGeneral.id));
+                      return (
+                        <div key={idx} className="bg-white border border-stone-250 p-2.5 rounded-none flex items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="font-serif font-black text-stone-900 text-xs flex gap-1.5 items-center">
+                                <span className="text-sm">{statsInfo.achieved ? '🥇' : '🔒'}</span>
+                                {ach.name}
+                              </span>
+                              <span className="text-[10.5px] font-bold text-stone-500 font-serif">
+                                【指标：{ach.targetDesc}】
+                              </span>
+                            </div>
+                            {/* Visual Progress Bar indicator */}
+                            <div className="w-full bg-stone-100 h-2.5 border border-stone-300 overflow-hidden flex relative items-center">
+                              <div 
+                                className={`h-full transition-all duration-500 ${statsInfo.achieved ? 'bg-amber-600' : 'bg-stone-500'}`}
+                                style={{ width: `${statsInfo.progress}%` }}
+                              ></div>
+                              <span className="absolute right-1 text-[8px] font-mono leading-none font-extrabold text-stone-700">
+                                {statsInfo.progress}%
+                              </span>
+                            </div>
+                          </div>
+                          {/* Crown or check icon for completed */}
+                          <div className="shrink-0">
+                            {statsInfo.achieved ? (
+                              <span className="bg-amber-500 text-amber-950 font-bold font-serif text-[10px] px-2 py-1 border border-amber-600 shadow-sm">
+                                已达标
+                              </span>
+                            ) : (
+                              <span className="bg-stone-100 text-stone-400 font-bold font-serif text-[10px] px-2 py-1 border border-stone-300">
+                                磨炼中
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="border-t border-stone-300 pt-4 flex gap-4 items-center">
               <div className="w-10 h-10 bg-artistic-crimson/10 border border-artistic-crimson flex items-center justify-center font-serif font-black text-artistic-crimson shrink-0">
