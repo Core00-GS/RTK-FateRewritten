@@ -85,6 +85,22 @@ export const GAME_CHAPTERS: Chapter[] = [
     period: '公元200年',
     startSceneId: 'c10_start',
     desc: '徐州战败弟兄离散，云长封金挂印，保皇嫂千里寻兄。神挡杀神过五关斩六将，忠义赤胆万世流传！'
+  },
+  {
+    id: 'c11',
+    num: '第十一章',
+    title: '洛水惊鸿，七步成诗',
+    period: '公元220年',
+    startSceneId: 'c11_start',
+    desc: '魏帝曹丕嫉恨同胞，于朝堂威逼曹植“七步成诗”，否则斩之。文采傲骨与洛水神女之叹，在此青史低吟。'
+  },
+  {
+    id: 'c12',
+    num: '第十二章',
+    title: '大魏求贤，奉策投效',
+    period: '公元210年 - 217年',
+    startSceneId: 'c12_start',
+    desc: '曹操打破士族垄断，以“求贤令”唯才是举。作为在野名士投效曹营，呈上囊括八荒之权略，助其安邦建庙。'
   }
 ];
 
@@ -386,247 +402,217 @@ export const GAME_SCENES: Record<string, StoryScene> = {
     title: '焦土葬虎，奇智扬威',
     year: 183,
     narration: '大火把黑夜烧得形同白日。贼兵狼奔豕突，余火焦味飘香数里。你用草料在关隘缴获了大批骏马金匹。你一战得名，翌晨神采飞扬，率军开拔幽州县城！',
-    historicalFact: '三国奇智用火极多。从博望坡到赤壁、夷陵。大火不仅销金蚀铁，更是智者逆袭宿命的最利国刃。',
+    historicalFact: '三国奇智用火极多。从博望坡到赤壁、夷陵。大火不仅销金蚀铁，更是智者逆袭宿命的终极手段。',
     options: [
       {
         id: 'c1_v_is_opt1',
-        text: '策马前行。得火攻马匹骏马，雄赳赳前往县城。',
+        text: '【凯旋】带缴获 of 战马装备，向幽州府库领赏！',
         effect: {
-          statChanges: { prestige: 15 }
+          statChanges: { troops: 300, gold: 200, prestige: 50, intelligence: 3 }
         },
         nextSceneId: 'c1_town_gateway'
       }
     ]
   },
+
   'c1_village_intel_fail': {
     id: 'c1_village_intel_fail',
     chapterId: 'c1',
-    title: '漏计遭焚，扼腕叹息',
+    title: '风急焦火，退走县城',
     year: 183,
-    narration: '你在校算合上有所差谬，未能锁死贼马，导致西庄化作瓦砾。幸亏你用重石连弩扼制咽喉。翌晨寇走，你望着破残焦土暗立誓誓：未来定当熟演阵图、一血此耻！',
-    historicalFact: '智谋不仅是兵书，更是血洗挫败换来的战场直觉。曹大帝一生遭火烧（濮阳、赤壁），亦终成不世奇主。',
+    narration: '本想诱敌深入纵火御敌，奈何风向突变，狂火反噬我军外林工事，哭嚎连连。虽吓退寇兵，但庄稼与外营焚毁大半。翌朝风和，你长叹重整行装引溃民前往县城求助。',
+    historicalFact: '智谋用火本属险招，无端风向、无常气候往往反教奇策化为浩劫。当年火烧乌巢 or 上方谷大雨皆如是。',
     options: [
       {
         id: 'c1_v_if_opt1',
-        text: '痛定思痛。带走残存老卒，前去城中进补给养。',
+        text: '痛定思痛，带领剩下的家眷溃卒徐徐撤向幽州城关。',
         effect: {
-          statChanges: { intelligence: 3 }
+          statChanges: { gold: -50, deviance: -10 }
         },
         nextSceneId: 'c1_town_gateway'
       }
     ]
   },
+
   'c1_town_gateway': {
     id: 'c1_town_gateway',
     chapterId: 'c1',
-    title: '涿郡城门口，皇榜前之长叹',
+    title: '幽州城门，群英会聚',
     year: 184,
-    narration: '公元184年（光和七年）正月，朝廷针对“黄巾妖道猖狂”贴出幽州招募义兵皇榜。你行至涿郡城门口，买回杂货农具。公告栏前百姓哀鸣，正围观谈论。身旁有一人身长七尺五寸，双手过膝，面如冠玉，长叹汉室陵迟。此人正是中原鼎镬主宰天命子——刘玄德！你欲如何上前与其应对？',
-    historicalFact: '《三国演义》：玄德看毕招兵公告，见上有国家多难，不觉闭目长叹。此时张飞在后厉声喝止。而若有穿越时局之第四人上前干预，一世因果将完全不同。',
+    narration: '公元184年春，幽州涿县。你率众来到城门口，只见告示牌前挤满了人。因黄巾程远志犯境，校尉邹靖张贴了招募义勇的告示。人群之中，有三人长叹短叹——一人双耳垂肩、双手过膝（刘备）；一人身长九尺、髯长二尺（关羽）；一人豹头环眼、燕颔虎须（张飞）。他们正欲相约前去酒肆，再谋结义。你要如何参与其中？',
+    historicalFact: '历史上刘关张三人在涿郡张飞庄后桃园结义，结为异姓兄弟，从此誓同生死，逐鹿天下。',
     options: [
       {
         id: 'c1_town_opt1',
-        text: '【躬身上前】长揖相问：『看公气度轩昂非比凡俗，黄巾既乱，大丈夫何故不立，反在此嗟伤长叹？』',
+        text: '【共谋大业】上前慷慨陈词，邀请三人共克时艰，前往张庄后园商讨结盟！',
         effect: {
-          statChanges: { virtue: 15, prestige: 10 },
-          customLog: '你上前躬身，言辞中规温厚，深受重仁厚礼之刘备青睐。刘备心中微震，顿然一洗凄凉。'
+          statChanges: { prestige: 20, virtue: 10 }
         },
         nextSceneId: 'c1_town_ask_unison'
       },
       {
         id: 'c1_town_opt2',
-        text: '【置若罔闻】买上自家农具、辎重与战备战马（消耗 10 黄金），无视叹气之辈。',
+        text: '【独自招募】冷眼视之，不愿与这三人打交道，自主去涿郡募集豪杰，独树大旗！',
         effect: {
-          statChanges: { gold: -10, force: 2, intelligence: 2 },
-          customLog: '你买了黄金辎重庄具。刘、关、张自行结交，你对这无伞孤寒客全无心结。你走上了独行于世的历史自立大道。'
+          statChanges: { deviance: 20, gold: -100, troops: 150 }
         },
         nextSceneId: 'c1_no_relation_path'
       },
       {
         id: 'c1_town_opt3',
-        text: '【粗声喝训】喝斥刘备：『堂堂昂藏男儿不求杀敌塞外，在此皇榜下妇人般凄吁长叹，何其怯也！』',
+        text: '【怒斥蛮勇】见市井之中，关羽和张飞无视禁令、争相打斗，上前强行喝止！',
         effect: {
-          statChanges: { force: 5, virtue: -10, deviance: 10 },
-          customLog: '你当街大张喝斥，刘备汗涔垂脸，在旁摆鞋之官吏多有白眼。你也因此失去了与刘玄德一结宿世血义的最佳切口。'
+          statChanges: { leadership: 5, force: 2 }
         },
         nextSceneId: 'c1_town_reprimand'
       }
     ]
   },
+
+  'c1_town_reprimand': {
+    id: 'c1_town_reprimand',
+    chapterId: 'c1',
+    title: '街头断斗，义训双雄',
+    year: 184,
+    narration: '市井之中，杀猪贩绿豆的壮汉扭扯在一处。你快步上前厉声喝道：“如今国难当头，黄巾乱兵就在旦夕，汝等空有一身惊世神武，不思报国安民，反在街衢斗气，何其浅薄！”那红脸（关羽）与环眼（张飞）大汉听罢一震，面露愧色，齐齐松手退开。',
+    historicalFact: '关于关张打斗、肉铺冲突多见于民间评话与平话三国，在正史演义中二人早已情同手足。',
+    options: [
+      {
+        id: 'c1_tr_opt1',
+        text: '诚恳相邀，三人心气渐通，邀其同往酒肆一叙。',
+        effect: {
+          statChanges: { leadership: 8, virtue: 5 }
+        },
+        nextSceneId: 'c1_town_ask_unison'
+      }
+    ]
+  },
+
   'c1_town_ask_unison': {
     id: 'c1_town_ask_unison',
     chapterId: 'c1',
-    title: '异口同叹，雷霆震耳',
+    title: '幽州酒肆，煮酒论义',
     year: 184,
-    narration: '你刚揖礼询问玄德，只听身后斜里突然炸裂出一声巨暴喝：『堂堂大丈夫，不与国家出力，专在此长叹，是何道理？』雷言字句、音节与你同声高低、如出一路！你诧异望去，一豹头大汉（张飞）大步行来。张飞见你身躯强壮、英英勃勃，竟大乐拍掌：『哈哈哈！这位好汉所言竟与俺这个屠户不差分毫！俺庄上张酒极热，欲邀你二位去肆共饮结友，足下可愿同行？』',
-    historicalFact: '历史上张飞庄产极富，当街大吼刘备，两人因义相识。现今加上你的干涉，桃园之会已至四人交口相合。',
+    narration: '在酒肆雅座之中，四人相谈甚欢。刘玄德大谈汉室宗亲、匡扶天下之志；关云长面红而沉毅，言道愿追随仁义；张翼德则高声嚷嚷，称张庄后桃园盛开，当行结义。然而，结义之法也有分歧。张飞建议备办乌牛白马，而关羽则有些迟疑，你该选择支持谁的建议？',
+    historicalFact: '演义中，结义仪式非常隆重，大办乌牛白马、祭告天地，而正史中仅称“恩若兄弟，同榻而眠”。',
     options: [
       {
         id: 'c1_t_au_opt1',
-        text: '【大笑允诺】『天下好汉共饮，正合我辈之孤傲！走，共赴桃园庄共浮大白！』',
+        text: '【全力支持张飞】赞同张翼德！备办乌牛白马、丰厚贡礼，正式敬告天地！',
         effect: {
-          statChanges: { virtue: 10, prestige: 15 },
-          customLog: '你畅笑允诺伙伴 invitation。刘、关、张三人对你之雄迈大笑豪爽极感相惜。'
+          statChanges: { popularity: 10, gold: -100 }
         },
         nextSceneId: 'c1_with_zhangfei_path'
       },
       {
         id: 'c1_t_au_opt2',
-        text: '【托托独行】谢过好意，言称庄务尚忙要先行置办铁锁刀刃。随后再来赴桃香。',
+        text: '【听从云长之虑】支持关云长！认为如今军情紧急，不宜过于铺张，仅购备兵刃重甲大旗，便是不朽结拜！',
         effect: {
-          statChanges: { gold: -10, force: 1, intelligence: 1 },
-          customLog: '你婉约拒绝了急聘行。独自在夜市采购。这使得关张刘独自游行，而你将在后街目睹惊天打架风波！'
+          statChanges: { intelligence: 5, gold: 50, troops: 50 }
         },
         nextSceneId: 'c1_buy_tools_path'
       }
     ]
   },
+
   'c1_with_zhangfei_path': {
     id: 'c1_with_zhangfei_path',
     chapterId: 'c1',
-    title: '巨磨压井，关公神力托石',
+    title: '桃园歃血，四杰同誓',
     year: 184,
-    narration: '你同刘备、张飞齐步行过县后老街。忽然看见一口深井井口，给一副沉重如山的千斤石磨盘严实死死盖住。盘上留有黑漆：『肉在井冷，凡能挪此磨搬盖者，切肉自取食之！』街尾有一红脸长须、身长九尺、威毅堂堂的好汉（关羽）正推车卖豆。见围拥难搬，大汉呵呵朗笑，挽袖上前，一掌抵住盘角，憋劲狂啸——『嘿！』千斤巨石磨竟如草芥般平平端起！你、备、飞当即振臂狂欢！',
-    historicalFact: '演义评书细节：张飞有意试探关羽，肉藏井底，重石压之，关羽单臂托石分肉，以此立威。关张二人自此结下雄魂死仇与天交。',
+    narration: '桃花飞舞，天地鉴之。张庄后园里，乌牛白马祭礼齐备，红烛高烧。你们四人歃血同盟，焚香跪拜。刘备、关羽、张飞和你并肩而立，大声齐誓：“同心协力，救困扶危；上报国家，下安黎庶。不求同年同月同日生，只愿同年同月同日死！”兄弟之情，从此坚如磐石！',
+    historicalFact: '经典的桃园三结义（此处多了一位主公的大夏誓师，构成四英同盟），是千百年来中国忠义文化的终极象征。',
     options: [
       {
         id: 'c1_w_zf_opt1',
-        text: '【大喜相邀】上前拱手：『真好汉也！吾等三人正要去张庄桃园饮大酒，英雄必往同聚！』',
+        text: '结拜礼成！与兄弟们痛饮通宵，翌日整军出发！',
         effect: {
-          statChanges: { virtue: 15, leadership: 5 },
-          customLog: '你上前施礼、礼聘英雄下推车。关公大喜，自赞相见恨晚。四人同赴张庄后园。桃香怒放。'
+          statChanges: { virtue: 15, prestige: 40 }
         },
         nextSceneId: 'c1_1'
       }
     ]
   },
+
   'c1_buy_tools_path': {
     id: 'c1_buy_tools_path',
     chapterId: 'c1',
-    title: '市井飞砂，红黑双雄当街揪打',
+    title: '铁匠买军火 · 云长翼德角力',
     year: 184,
-    narration: '你独自采购铁镢、强弩，折返回涿县西街集市。忽听得前街吼声震天，人肉逃跑乱撞，店家锅釜尽倒。百姓惊骇呼叫：『不好了！张屠户和那个推车卖豆的红脸恶大汉在对撕扭打呀！』你抢前一步推看过去，只见雷天震碎，一黑一红纠合搏击，飞砖走瓦，两方铁拳快如旋流，围卫军汉手执刀器无一敢近！你欲如何化解战局？',
-    historicalFact: '此乃关羽、张飞在涿县最初相识的斗殴。两家因挪磨肉物结梁，两虎相恶私斗。最终系刘备在市中将其双臂揪扯荡开，惊服四海游侠。',
+    narration: '你们决定去涿县最好的铁匠铺，大肆收购镔铁准备铸造神兵。不料，在街头肉铺旁，关羽和张飞两个豪杰正为了争抢一车绿豆和猪肉，因意图试探彼此底细而扭扯成一团！两股排山倒海般的神功巨力合在一处，空气都因之颤抖，街道两旁的土瓦纷纷震碎！稍有不慎，这两位震古烁今的猛将就会两败俱伤！主公，你现在立于大风边缘，你将采取什么方式劝阻这场旷世决斗？',
+    historicalFact: '历史上关羽张飞早年相随，感情笃深。演义和民间评话中常有“街头神力较量、刘备徒手解围”的桥段，展现当世豪杰的盖世风采。',
     options: [
       {
         id: 'c1_bt_opt1',
-        text: '【神力插架】踏地大喝，神拳左右开弓，以两手肉掌死死钳住两头虎兽的拳臂！ (需要武力 75)',
+        text: '【武力震慑】大吼一喝！运起浑身大霸气 and 惊人武功，徒手分砸两人神力，强力震服！',
         requirement: { attribute: 'force', minVal: 75 },
         effect: {
-          statChanges: { force: 2, prestige: 50 },
-          customLog: '你强力破阵。双臂似有千钧。关羽、张飞两拳撞入你手！你竟然生生将二人狂流彻底扯开！二人大惊大服，当街跪拱称兄。'
+          statChanges: { force: 3, prestige: 50, leadership: 5 }
         },
         nextSceneId: 'c1_stop_fight_success'
       },
       {
         id: 'c1_bt_opt2',
-        text: '【单刀碎劝】武力不迨，强行隔开致身形多遭重击 (武力 75 以下)',
+        text: '【肉身死劝】不顾危险，直接用肉身飞扑其间强行解围，以诚心 and 忠烈感化双雄！ (武力不足 75 易受创)',
         effect: {
-          statChanges: { virtue: 5, troops: -10 },
-          customLog: '你拼一腔侠豪，用强抱隔战。被关张泄露的狂暴一腿微创，退后了数阶。所幸玄德公急奔而出，两手扯开双将，四将终同去后桃。'
+          statChanges: { virtue: 15, troops: -50 }
         },
         nextSceneId: 'c1_stop_fight_fail'
       },
       {
         id: 'c1_bt_opt3',
-        text: '【大智化解】雷呼：『幽州官兵执金吾来抓当私械斗砍头者也！』并抛乱石荡开二人 (需要智力 70)',
+        text: '【巧智化解】大喊“县尉曹兵已至！”并用金钱砸向周围路人制造混乱，以极快极妙的手腕使双雄停手！',
         requirement: { attribute: 'intelligence', minVal: 70 },
         effect: {
-          statChanges: { intelligence: 2, prestige: 30 },
-          customLog: '你妙吼吓贼。两汉私斗本亏律令，你大步上前用大义剖分英雄报国理，使关张羞涩收拳。大义昭昭，深受折佩！'
+          statChanges: { intelligence: 3, gold: -50 }
         },
         nextSceneId: 'c1_stop_fight_intel_success'
       },
       {
         id: 'c1_bt_opt4',
-        text: '【隔火观之】冷艳旁观市角，等刘备上前荡开劝局。',
+        text: '【静观其变】自己不擅武学智计，默默注视刘玄德，笃信玄德自有帝王神授之力上前解斗！',
         effect: {
-          statChanges: { politics: 2 }
+          statChanges: { virtue: 5 }
         },
         nextSceneId: 'c1_liubei_resolves'
       }
     ]
   },
+
   'c1_stop_fight_success': {
     id: 'c1_stop_fight_success',
     chapterId: 'c1',
-    title: '力伏红黑，英雄大相惜',
+    title: '神勇碎力，震服双雄',
     year: 184,
-    cgImage: 'taoyuan_oath.jpg',
-    narration: '关羽、张飞同时收回青紫拳头，心骇折服望着你，极赞阁下神勇。你在当街展现惊天战战能。一旁的刘玄德看入眼中，激荡起伏。四豪杰大誓相遇。张飞拍手大骂叫快，大步邀你们同携手赶赴自家桃花后庄！',
-    historicalFact: '演义上只刘备拉开二人，现由你施神勇平伏二豪。在幽州游侠圈，阁下大名盖世。',
+    narration: '主公怒啸暴长，运起万钧臂力，如泰山压顶般悍然插入两人臂骨合抱中，雷霆一声“散！”生生撕开了两人的死斗角力！关羽与张飞皆大退数步，虎口发麻，惊叹望向你：“真天神之威也！”两人对你佩服得五体投地！',
+    historicalFact: '乱世唯武独尊，以力量正面击服绝对强者，是最快获取项羽、关张等超一流猛士仰首的捷径。',
     options: [
       {
         id: 'c1_sfs_opt1',
-        text: '乘兴拉着关张两巨熊，一席乘风赶赴桃园宿契。',
-        effect: {},
+        text: '与双雄豪爽大笑，收拢宿愿，同往桃园结义！',
+        effect: {
+          statChanges: { force: 5, prestige: 50 }
+        },
         nextSceneId: 'c1_1'
       }
     ]
   },
+
   'c1_stop_fight_intel_success': {
     id: 'c1_stop_fight_intel_success',
     chapterId: 'c1',
-    title: '大义止戈，智伏猛将',
+    title: '智言止杀，奇巧避嫌',
     year: 184,
-    narration: '你剖理大骂：『黄巾百万，黎庶将死。二位空有盖世伟力，不思扫平国逆、立功不世，在这臭水井口市井私怨，不可耻乎？』。关羽抚长须大叹折服，张飞面红道歉。刘备在一旁含泪施礼极赞。四人同向张庄走马而去！',
-    historicalFact: '儒雅多才者，以理折人。关公读《春秋》，最喜春秋大义，你之理大合其魂。',
+    narration: '你见势不妙，扯开喉咙高呼：“曹氏宪卫、幽州大军已包抄过来，市井闹事罪当充军立斩！还不速速散去！”更反手倒撒大把黄金碎银，大吼：“猪肉绿豆大甩卖，见者有份！”引得周围无数黔首难民蜂拥争抢乱撞，生生切断了两虎的对战空当。两雄不得不尴尬收招，面面相觑，服你神机妙算。',
+    historicalFact: '智谋者不弄拳脚，而以天下人心、市井诡谲、利禄诱利，来不战而屈人之兵。',
     options: [
       {
         id: 'c1_sfis_opt1',
-        text: '四将在涿酒芬芳中开步，赶往大桃园。',
-        effect: {},
-        nextSceneId: 'c1_1'
-      }
-    ]
-  },
-  'c1_stop_fight_fail': {
-    id: 'c1_stop_fight_fail',
-    chapterId: 'c1',
-    title: '拳风震荡，二英收执',
-    year: 184,
-    narration: '多方推开后人。虽然你身躯血气微损，但在双将暴杀锋芒中挺胸，亦展现了绝凡傲胆！刘玄德乘势上前规劝，红黑豪杰最终悔去，邀你同往桃园共创大业。',
-    historicalFact: '刘关张虽然神勇，亦是极重胆魄之辈。无畏挺身死劝，足能收买英雄心骨。',
-    options: [
-      {
-        id: 'c1_sff_opt1',
-        text: '虽骨骼微疼，也大笑抹干，同去饮酒结交。',
-        effect: {},
-        nextSceneId: 'c1_1'
-      }
-    ]
-  },
-  'c1_liubei_resolves': {
-    id: 'c1_liubei_resolves',
-    chapterId: 'c1',
-    title: '玄德荡架，四侠齐赴庄园',
-    year: 184,
-    narration: '你在一旁神态悠闲，眼看刘备纵马狂跳入局。刘玄德双臂异能大开揪开两凶。关张二人因玄德贵族大汉长子姿仪顿然收势停手。四人交好大笑，同拉着你去后园深树。',
-    historicalFact: '大势按常推展。刘备的统驭威摄正在默默成型。你未立大功，但同席能人已聚。',
-    options: [
-      {
-        id: 'c1_lr_opt1',
-        text: '跟随桃香步武，一同涉足张庄后园。',
-        effect: {},
-        nextSceneId: 'c1_1'
-      }
-    ]
-  },
-  'c1_no_relation_path': {
-    id: 'c1_no_relation_path',
-    chapterId: 'c1',
-    title: '独辟大旗，誓为自立雄主',
-    year: 184,
-    narration: '你冷视了公告牌，不愿参与桃香。刘、关、张白眼叹息走回，在后庄结盟成为生生死结。而你在涿郡中独自招贤。由于你武烈或大富，自主募得了首批大军。黄巾兵潮，当面杀来！这世间天命是否也有不靠刘备亦能荡平黄巾之法？',
-    historicalFact: '历史上有孔融、公孙瓒、曹操。他们都与结义兄弟无关。在偏离大势的独行自立大道上，大旗任你挥舞！',
-    options: [
-      {
-        id: 'c1_nr_opt1',
-        text: '【我当争霸】磨刀霍霍。统领精兵开拔前线迎击程远志！',
+        text: '含笑上前赔礼，揭开心结，一同携手去张庄桃园！',
         effect: {
-          statChanges: { troops: 500, gold: 100 }
+          statChanges: { intelligence: 5, virtue: 10 }
         },
-        nextSceneId: 'c1_fight'
+        nextSceneId: 'c1_1'
       }
     ]
   },
@@ -667,37 +653,6 @@ export const GAME_SCENES: Record<string, StoryScene> = {
           customLog: '大军结成圆阵，稳扎稳打。虽全歼乱兵，但义军死伤颇多，所幸获得部分降兵充实行伍。'
         },
         nextSceneId: 'c2_start'
-      }
-    ]
-  },
-  
-  'c1_1': {
-    id: 'c1_1',
-    chapterId: 'c1',
-    title: '卧牛山黄巾骤现 · 智计排兵对阵',
-    year: 184,
-    narration: '四英宿愿既定，正欲起兵。探子飞马急报：幽州边境、卧牛山一带，有黄巾军骁将裴元绍，率领两团啸聚山林的乱民贼寇三千余众大肆侵犯乡村，扼守涿郡商道。彼虽无章，但地势险要，草木皆兵。刘备抚起配剑叹道：“吾军方建，正可仗赖诸君神威犁平此贼，以安人心！”军情孔急，排兵布阵就在瞬息之间：',
-    historicalFact: '裴元绍是三国演义中在卧牛山盘踞的黄巾偏将，后意图盗取赵云的照夜玉狮子马被赵云刺死。本传中你将在战线初期与之交锋。',
-    options: [
-      {
-        id: 'c1_pei_opt1',
-        text: '【锥形猛打阵】以骁勇张飞、关羽为前后双锋，摆出锥形进攻阵，单刀直入取裴元绍项上首级！',
-        requirement: { attribute: 'force', minVal: 65 },
-        effect: {
-          statChanges: { force: 2, leadership: 1, troops: -150 },
-          customLog: '你命三军立起大漠惊牛锥形冲击阵。张飞狂叫跃马当先，关羽从侧翼突击掩杀。破阵同时，义勇军冲锋肉搏折损了150名勇士，裴元绍首尾难顾，大溃而退！'
-        },
-        nextSceneId: 'c1_pei_force'
-      },
-      {
-        id: 'c1_pei_opt2',
-        text: '【圆衡诱敌计】玩家设假虚营为诱饵，退入山谷两翼布下口袋，计捕野性悍贼！',
-        requirement: { attribute: 'intelligence', minVal: 65 },
-        effect: {
-          statChanges: { intelligence: 3, virtue: 1 },
-          customLog: '你施计让疑兵徐徐败退，将贪功的裴元绍诱至狭谷要塞，两厢齐鸣金火抛石，逼使乱兵束手无策！'
-        },
-        nextSceneId: 'c1_pei_intel'
       }
     ]
   },
@@ -978,7 +933,7 @@ export const GAME_SCENES: Record<string, StoryScene> = {
   'c4_start': {
     id: 'c4_start',
     chapterId: 'c4',
-    title: '大浪淘沙，重理大鼎',
+    title: '大浪淘沙，重理大鼎2',
     year: 196,
     narration: '至公元196年，讨董联盟彻底星散成灰。袁绍雄据河北，曹操挟汉帝迁于许昌，名重天下。如今天下无主，群雄割据，你的地盘在乱世挤压中已不容迟疑，要么大张旗鼓自成一方诸侯，要么投靠强敌辅政大业。你该如何确立你的天下战略？',
     historicalFact: '曹操于九六年挟天子以令诸侯，占据大义；刘皇叔四处漂泊无固定根据地。天下中原彻底进入战国博弈。',
@@ -1012,6 +967,16 @@ export const GAME_SCENES: Record<string, StoryScene> = {
           customLog: '你接受曹操的册封为副统帅。在他的太守会馆，你与鬼才郭嘉终日讨论局势。郭嘉大觉你的胸怀如龙，成了你可以策动的亲密密谋！'
         },
         nextSceneId: 'c5_start'
+      },
+      {
+        id: 'c4_s_opt4',
+        text: '【天子救驾】乘东都残破、天子潜逃黄河，带兵星夜奉逆天子移驾太室！（需德行 75）',
+        requirement: { attribute: 'virtue', minVal: 75, neededGold: 200 },
+        effect: {
+          statChanges: { virtue: 20, prestige: 300, deviance: 15 },
+          customLog: '因你高德清世，名声清正，天子在残垣断壁中拉住你的衣袖，封你为大司马。天子流泪奉迎于你的据点，彻底改写了大汉帝统的覆亡路线！'
+        },
+        nextSceneId: 'c4_emperor_route'
       }
     ]
   },
@@ -1020,26 +985,82 @@ export const GAME_SCENES: Record<string, StoryScene> = {
     chapterId: 'c4',
     title: '天子临关，霸道大权',
     year: 196,
-    narration: '在长安，你完成了绝世奇谋——在其余诸侯毫不知情下强行救出并把持了大汉天子刘协！现在，你是天下唯一实际垄断汉家天宪的人。曹操极恨，袁绍自责。你要拿天子执行什么政策？',
+    narration: '在洛阳畿辅，你完成了绝世奇谋——奉迎并把持了大汉天子刘协！现在，你是天下唯一实际垄断大汉宗庙天判的人。曹操极恨，袁绍自责。你要拿天子执行什么大略？',
     historicalFact: '本是曹操挟天子迁许，从此独家使用皇帝名牌。',
     options: [
       {
         id: 'c4_er_opt1',
-        text: '【挟天子以令诸侯】强诏曹操等，勒令裁并军备，索要魏军的并州土地！',
+        text: '【挟天子以令诸侯】行霸主权柄！强行诏令魏、吴，勒令裁兵纳税并割让并州。',
         effect: {
           statChanges: { politics: 15, prestige: 300, gold: 1000, deviance: 30 },
-          changeFaction: { regionId: 'yecheng', faction: 'PLAYER' },
-          customLog: '天子玉玺盖印，诏命通行宇内！百官听命于你，你调兵割取冀州邺城重镇，曹操、袁绍震怒却不得不屈尊奉表。'
+          changeFaction: { regionId: 'taiyuan', faction: 'PLAYER' },
+          customLog: '天子御玺盖印，诏命通行宇内！你以霸道之权割调太原等郡，曹操、袁绍震怒却不得不口尊贤能。'
+        },
+        nextSceneId: 'c4_emperor_tyranny'
+      },
+      {
+        id: 'c4_er_opt2',
+        text: '【奉天子以从民望】行仁王复辟！分治政权予宗室，宣布天下齐合勤王。',
+        effect: {
+          statChanges: { virtue: 25, prestige: 200, troops: 3000 },
+          addGeneral: 'liubei',
+          customLog: '你尊崇天子而不越位，刘备皇叔闻讯奔归大司马帐下。英雄会聚，天下归心！'
+        },
+        nextSceneId: 'c4_emperor_virtue'
+      }
+    ]
+  },
+  'c4_emperor_tyranny': {
+    id: 'c4_emperor_tyranny',
+    chapterId: 'c4',
+    title: '衣带诏密谋，挟天统驭',
+    year: 198,
+    narration: '你挟奉汉帝，权倾野朝。忠臣董承等私受汉帝血写在内衣的“衣带密诏”，联合外部谋刺大司马，事机不幸败露。军马围住深宫，被搜获密诏的天子面色如土。主公今日如何发落？',
+    historicalFact: '历史中曹操严酷诛夷董承董贵人等，使得汉献帝处境极其恐怖窒息。',
+    options: [
+      {
+        id: 'c4_et_opt1',
+        text: '【雷霆夷族】朝堂处斩董臣等，武卫禁苑，迫使汉帝另颁立你为丞相之诏！',
+        effect: {
+          statChanges: { politics: 20, force: 10, prestige: 250, virtue: -15, deviance: 25 },
+          customLog: '你诛杀叛臣，在殿堂高傲升迁为主政丞相。虽失天下君子之和，但挟令霸道空前暴涨。'
         },
         nextSceneId: 'c5_start'
       },
       {
-        id: 'c4_er_opt2',
-        text: '【奉天子以从民望】将大权分予刘备并与大贤结社，宣布天下同讨魏贼、东吴等。',
+        id: 'c4_et_opt2',
+        text: '【焚书宽宥】朝会之时当众将衣带诏火解，宣称此乃奸人假冒，安抚天子重定心神。',
         effect: {
-          statChanges: { virtue: 25, prestige: 200, troops: 3000 },
-          addGeneral: 'liubei',
-          customLog: '你将部分军中最高权限交予刘备皇叔，两人同在殿中执手大哭，天下皆知你在复兴正轨大汉，志气一呼百诺，无数大好忠臣名将从魏、吴叛逃归顺。'
+          statChanges: { virtue: 22, intelligence: 15, politics: 10, deviance: 5 },
+          customLog: '你展现了极其宏大的容人之量，汉献帝感激涕零。忠名重传各野，反倒解除了后续朝叛之乱。'
+        },
+        nextSceneId: 'c5_start'
+      }
+    ]
+  },
+  'c4_emperor_virtue': {
+    id: 'c4_emperor_virtue',
+    chapterId: 'c4',
+    title: '天子临田，劝课农桑',
+    year: 198,
+    narration: '大司马，你尊奉大汉法统，开办广厦屯田。汉献帝刘协在你的陪同下亲自前行汉中与并州边缘的麦垄，扶犁躬耕，吸引数十万战乱中的百姓奔向你的庇下。接下来你要推行哪条大政？',
+    historicalFact: '历史中，曹氏将天子深幽于许昌宫阙。天子临田耕稼实属万代汉臣辅佐的无上佳话。',
+    options: [
+      {
+        id: 'c4_ev_opt1',
+        text: '【九品官制】宣布唯才是举与九品官法，在太学提拔豪桀寒门子弟。',
+        effect: {
+          statChanges: { politics: 25, leadership: 15, intelligence: 10 },
+          customLog: '太学博士立，数十位精武统率自此归在府兵之中，大军的行政治理效率达到神话级的极速。'
+        },
+        nextSceneId: 'c5_start'
+      },
+      {
+        id: 'c4_ev_opt2',
+        text: '【广修文教】遣汉官出使西域、重建河西儒学。',
+        effect: {
+          statChanges: { prestige: 400, virtue: 25, intelligence: 15 },
+          customLog: '神州士族高呼大司马为“当世周公”！万古文昌功垂不朽！'
         },
         nextSceneId: 'c5_start'
       }
@@ -1453,7 +1474,7 @@ export const GAME_SCENES: Record<string, StoryScene> = {
     chapterId: 'c10',
     title: '古城大叙，袍泽重聚',
     year: 200,
-    narration: '山高路长，古城之下尘土扬天。张翼德起初擂鼓欲试刀剑，然而当看到背道死拼护送的二嫂和斩下的魏关残将首级。三弟狂哭下跪搂肩，刘玄德轻马北来。桃园三豪杰于马前相拥而泣，周围战士万众流下滚热忠骨泪！兄弟复聚，天下共豪！',
+    narration: '山高路长，古城之下尘土扬天。张翼德起初擂鼓欲试刀剑，然而当看到背道死拼护送 of 二嫂 and 斩下的魏关残将首级。三弟狂哭下跪搂肩，刘玄德轻马北来。桃园三豪杰于马前相拥而泣，周围战士万众流下滚热忠骨泪！兄弟复聚，天下共豪！',
     historicalFact: '古城重聚后由于万民崇敬其大义，刘备军队战斗意志和民望扶摇九万里。',
     options: [
       {
@@ -1461,6 +1482,158 @@ export const GAME_SCENES: Record<string, StoryScene> = {
         text: '【王业腾骧】桃园再大亮！整军齐呼，扩主营部卒精悍，厉兵秣马高歌再战！',
         effect: {
           statChanges: { gold: 1200, troops: 2000, prestige: 220 }
+        },
+        nextSceneId: 'ending_emperor'
+      }
+    ]
+  },
+
+  // ------------ CHAPTER 11: POEM IN SEVEN STEPS ------------
+  'c11_start': {
+    id: 'c11_start',
+    chapterId: 'c11',
+    title: '朝堂威逼，七步成诗',
+    year: 220,
+    narration: '公元220年，大魏王曹操薨逝，长子曹丕嗣位为魏王，随后践祚称帝，建立曹魏。然而曹丕生性多疑，深忌同胞弟、才高八斗的临淄侯曹植。一日，曹丕于许昌大殿上召见曹植，周围带刀宿卫森立。曹丕厉声威逼道：『吾与汝虽为兄弟，然位分已殊。汝素自负经才，今命汝于朝堂之上，每行一步吟诗一首，七步之内若不成，则以谋逆罪斩首不贷！』朝堂百官战栗，无人敢发一言。主公在暗中观察形势，该当如何抉择？',
+    historicalFact: '《世说新语·文学》记载了曹植七步成诗的典故，而《三国志》及《后汉书》则详实记录了曹操长子曹丕与次子曹植长达数年的夺嫡之争，以及曹丕称帝后对诸弟的防范与削爵逼迫。',
+    options: [
+      {
+        id: 'c11_opt_assist',
+        text: '【代拟神作】施加文华妙技，暗中辅助曹植吟诵出流传千古的《七步诗》，以此唤醒同胞骨肉之情。',
+        effect: {
+          statChanges: { virtue: 180, prestige: 220, politics: 40 },
+          customLog: '“煮豆燃豆萁，豆在釜中泣。本自同根生，相煎何太急！”曹植神态自若走步吟诵，声泪俱下。曹丕听罢泣不成声，深感愧疚，当堂降诏宽免，只贬其爵。同胞骨肉相残之大悲得以避免，主公也大张海内仁人声望！'
+        },
+        nextSceneId: 'c11_luoshen'
+      },
+      {
+        id: 'c11_opt_resist',
+        text: '【洛神赋词】不屑应答朝堂威逼，拂袖出殿，至黄昏洛水之畔，遥思故人，挥笔写下惊艳世人的《洛神赋》。',
+        effect: {
+          statChanges: { prestige: 350, deviance: 40, virtue: 100 },
+          customLog: '“翩若惊鸿，婉若游龙。荣曜秋菊，华茂春松。”曹植临风长啸，挥毫落墨。凄婉超凡的辞章传遍中原，洛河神女之女真姬幻影似在云梦中拂袖起舞。此文学巨作不朽，天下士子无不将主公与曹植视为千古知音与神仙才俊！'
+        },
+        nextSceneId: 'c11_success'
+      },
+      {
+        id: 'c11_opt_revolt',
+        text: '【反客为主】暗中策动在野义士与曹植的旧部宿卫，在许昌朝堂发动伏兵死斗，强行保下曹植并直击曹丕！',
+        effect: {
+          statChanges: { troops: -600, deviance: 120, gold: -400, force: 100 },
+          customLog: '历史狂轨倾复！许昌大殿当堂血飞如星。主公的便衣宿卫和曹植府兵拔键大杀，曹丕宿卫仓皇御敌。两军激战一昼夜，曹丕惊惧妥协，被迫许诺封曹植为临淄王自立一国。大魏内部分裂，大汉史学家无不目瞪口呆！'
+        },
+        nextSceneId: 'c11_success'
+      }
+    ]
+  },
+  'c11_luoshen': {
+    id: 'c11_luoshen',
+    chapterId: 'c11',
+    title: '翩若惊鸿，神女出尘',
+    year: 220,
+    narration: '朝堂脱难后，曹植行至清冷碧绿的洛水之畔。斜阳芳草之中，风吹白雾，隐约可见一位天姿倾国之丽人立于波涛之上，衣带当风，仙姿绰约。她美眸含泪，朱唇微启：『君才高比天，奈何生于帝王之家。这枚洛神美玉，愿赠予知音，愿乱世英雄，能一洗骨肉相残、红颜夭亡之悲情。』说罢，化为大雁没入苍茫云烟。主公握此美玉，只觉手中留香，胸有千秋。',
+    historicalFact: '洛神赋相传原名《感甄赋》，野史、唐代李善注中多有关于曹植与嫂甄氏、以及洛水神女传说的浪漫联想、写景绝伦，展现了文学史上的极致唯美。',
+    options: [
+      {
+        id: 'c11_luoshen_opt1',
+        text: '【神玉入册】珍藏洛神佩玉，承袭其翩跹灵气，安抚天下受难之红颜士子。',
+        effect: {
+          statChanges: { virtue: 120, prestige: 150, gold: 300 },
+          customLog: '你珍重收下洛神玉佩，洛水中泛起一层金黄氤氲，预示着文治人望大盛。'
+        },
+        nextSceneId: 'c11_success'
+      }
+    ]
+  },
+  'c11_success': {
+    id: 'c11_success',
+    chapterId: 'c11',
+    title: '文人高义，余音绕梁',
+    year: 220,
+    narration: '洛水浩荡，文采千秋。经此命轨之劫，文能抗威，诗可通神。天下名宿、建安诸子听闻主公之超然运作，无不抱拳景仰，纷纷前来涿郡会盟。主公平添了无数惊世文墨名望，为接下来的乱世大业奠定了不拔的精神高标！',
+    historicalFact: '曹丕与曹植虽然政治矛盾酷烈，但二人在文学史上与曹操并称“三曹”，是建安文学的风骨奠基者，引领了中国古典诗歌的又一次高峰。',
+    options: [
+      {
+        id: 'c11_suc_opt1',
+        text: '【文治大兴】设高台招揽天下名仕儒生，令大汉风骨万代播扬！',
+        effect: {
+          statChanges: { virtue: 100, prestige: 200, gold: 500 }
+        },
+        nextSceneId: 'ending_emperor'
+      }
+    ]
+  },
+
+  // ------------ CHAPTER 12: CAO CAO SEEKING TALENTS ------------
+  'c12_start': {
+    id: 'c12_start',
+    chapterId: 'c12',
+    title: '三道求贤，唯才是举',
+    year: 210,
+    narration: '公元210年至217年间，一代枭雄曹操在中原巩固霸业，面对世家大族的顽强阻挠以及四方诸侯的缠斗，为广募英杰，不拘一格，在许昌连续颁布了三次震惊宇内的《求贤令》，大呼：『若必廉士而后可用，则齐桓其何以霸世！今天下得无有至德之人，二三子其佐我明扬仄陋，唯才是举，吾得而用之。』主公作为在野奇才、王佐之士，决定顺应大势，投身曹氏阵营！',
+    historicalFact: '曹操著名的“求贤三令”打破了自东汉以来依靠门第、孝廉选官的腐朽制度，提出“唯才是举”口号，是北方得以迅速平定分裂并恢复生产的重大阶级战略。',
+    options: [
+      {
+        id: 'c12_opt_advisor',
+        text: '【呈十胜策】亲赴邺城铜雀台，向曹操呈献《囊括八荒十胜十败大策》，辅佐其唯才是举、破格征辟。',
+        effect: {
+          statChanges: { intelligence: 180, prestige: 250, politics: 45 },
+          customLog: '曹操览毕策书，惊喜过望，当即解下身上锦袍披于你身，大呼：『公真吾之子房、郭奉孝再生也！』拜你为首席参谋，大魏贤良闻风而动，英杰聚如繁星。你成为了操盘北中国大局的一代军师！'
+        },
+        nextSceneId: 'c12_visiting'
+      },
+      {
+        id: 'c12_opt_emperor',
+        text: '【奉天子令】极力协助曹操贯彻“奉天子以令不臣，修耕植以畜军实”之大计，扩充王道屯田军需。',
+        effect: {
+          statChanges: { leadership: 150, troops: 1800, gold: 800 },
+          customLog: '你协理朝纲、整顿屯田兵粮。许都官民安居乐业，大批难民归化为青州兵卒。曹操赞你：『足食足兵，建不世之基，卿居功首位。』大魏大纛招展，军势如破竹！'
+        },
+        nextSceneId: 'c12_success'
+      },
+      {
+        id: 'c12_opt_pacify',
+        text: '【安民招抚】要求曹操对投降、归宿的普通汉臣及地方守将大开不株连之门，以民心政治消解乱局。',
+        effect: {
+          statChanges: { virtue: 250, politics: 60, deviance: -30 },
+          customLog: '你主张的厚德宽仁和不究往宿，使得曹魏版图内各路抗拒力量纷纷解剑归顺。大魏不仅招来了良将，更得到了广袤百姓的拥护。中原动荡暴跌，海内共敬你的仁德救世！'
+        },
+        nextSceneId: 'c12_success'
+      }
+    ]
+  },
+  'c12_visiting': {
+    id: 'c12_visiting',
+    chapterId: 'c12',
+    title: '阿瞒拜贤，绝食跣足',
+    year: 212,
+    narration: '一日深夜，曹操听闻主公有关于平定关陇、迎战刘吴的至妙军事画轴，竟然大喜欲狂。他来不及穿鞋、甚至连口中饭粒都来不及咽下，跣足（赤脚）狂奔出营门迎接主公，一把攥住主公双手大叹：『孤深夜渴盼，犹如久旱之望云。今得卿佐，孤大业稳矣！』操引主公步入大帐，秉烛促膝谈至天明，天下雄主对你的敬畏重托无以复加。',
+    historicalFact: '历史上曹操“跣足迎许攸”、“不拘小节尊贤”为人津津乐道，充分彰显了他礼贤下士、求才如渴的雄主胸怀与不拘一格之鲜活个性。',
+    options: [
+      {
+        id: 'c12_visit_opt1',
+        text: '【倾囊相佐】指画大势！为曹魏大军划定一鼓作气横扫徐豫、稳定中原防线之全盘战略！',
+        effect: {
+          statChanges: { leadership: 100, troops: 1500, gold: 600 },
+          customLog: '烛火明灭中，你挥毫在军事布防图上点出天险关节。曹操连连击节赞叹，下令北方十万守军即刻依令执行变轨！'
+        },
+        nextSceneId: 'c12_success'
+      }
+    ]
+  },
+  'c12_success': {
+    id: 'c12_success',
+    chapterId: 'c12',
+    title: '贤集魏基，天下定鼎',
+    year: 215,
+    narration: '良禽择木而栖，贤臣择主而事。主公投身曹魏，不仅成就了自己操兵指划的旷世才华，更将个人声望推至权勋顶峰。大魏军旗之下，百万人马屯田复苏，良将谋臣在你的统御调度下严阵以待。大业磐石已定，只待翻云覆雨，一统寰宇！',
+    historicalFact: '大魏政权在不拘一格召贤纳贡后，拥有了当时中国最庞大的文官与将领军团，这也为后来政权更替后的天下一统奠定了广博的物质与军政基石。',
+    options: [
+      {
+        id: 'c12_suc_opt1',
+        text: '【鼎定寰宇】誓助魏师建立万世一统不拔之基，终结数代生灵之屠戮！',
+        effect: {
+          statChanges: { gold: 1500, troops: 2500, prestige: 250 }
         },
         nextSceneId: 'ending_emperor'
       }

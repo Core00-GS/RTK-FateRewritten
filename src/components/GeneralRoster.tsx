@@ -55,11 +55,65 @@ const GENERAL_BONDS: Bond[] = [
   }
 ];
 
+export const GENERAL_QUOTES: Record<string, { high: string; medium: string; low: string }> = {
+  liubei: {
+    high: "操以霸临天下，备当以德泽济世。愿随主公，清剿曹贼，中兴炎汉！",
+    medium: "景升兄托我明礼，孤虽颠沛流离，唯不愿失信于天下。主公亦当视民如子。",
+    low: "日月逝矣，岁不我与。若库府空虚、只尚浮华，终不过是重蹈备前半生漂泊之覆辙罢了……"
+  },
+  guanyu: {
+    high: "玉可碎而不可改其白，竹可焚而不可毁其节！羽之偃月刀，誓为主公斩尽天下不臣！",
+    medium: "主公召羽来，羽自当竭忠效力。然汉贼不两立，王业不偏安，还望主公莫忘初心。",
+    low: "若主公视大义如儿戏，羽纵拼得首级不要，亦当重回桃园，自寻玄德兄长去矣！"
+  },
+  zhangfei: {
+    high: "哇呀呀！主公指哪我打哪！燕人张翼德，取敌将首级如探囊取物！",
+    medium: "听说校场里练兵酒不够喝？主公放心，只要好酒管够，末将定把那帮意气风发的小崽子训成恶狼！",
+    low: "整天克扣军饷，弟兄们都在饿肚子！主公要是再这么小气，老张俺可要砸了大营自去快活了！"
+  },
+  zhaoyun: {
+    high: "常山赵子龙在此！身经百战，百折不挠，主公所向，即为云枪锋所指！",
+    medium: "为明主驰骋疆场乃将领本分。如今兵革未息，百姓涂炭，还请主公克己奉公，善待士卒。",
+    low: "云素闻主公以仁义立世，若今日所行皆为一己私利残害忠良，云当挂印归于草野。"
+  },
+  zhugeliang: {
+    high: "鞠躬尽瘁，死而后已。主公之宏图，亮必竭诚以待，运筹帷幄之中，决胜千里之外！",
+    medium: "治国之道，要在得人；兵法之要，要在深谋。主公务必清心寡欲，徐图天下。",
+    low: "亮夜观天象，见微芒之星有陨落之兆。主公近来勤政荒废，恐国运难支，亮心忧如焚却无可奈何。"
+  },
+  taishici: {
+    high: "丈夫生世，当带三尺之剑，以升天子之阶！子义神射，为主公洞穿敌阵！",
+    medium: "某受老母临行重托，定要报答知遇之德。主公正直待某，某必以死相托。",
+    low: "壮志难酬，神骏困于驽马之槽。若主公不愿轻骑突袭，只图偏安，某之神弓恐将生锈。"
+  },
+  guojia: {
+    high: "主公胸怀吞吐宇宙之志，奉孝甘为马前卒！算无不中，今夜何不与奉孝共谋一醉，商榷天命？",
+    medium: "万物因势而动，兵无常势，水无常形。主公之策虽稳，但缺了一缕奇谋偏锋。奉孝在此，有一计当进。",
+    low: "咳、咳……奉孝体弱残躯，随主公征尘仆仆。若主公仍疑忌臣下、行事优柔，奉孝这残命，怕是撑不过这冬雪了。"
+  },
+  jiangwei: {
+    high: "承武侯之遗志，九死而不悔！主公，伯约已排定奇正战阵，只待一声令下，直捣中原！",
+    medium: "凉州羌胡摇摆，中原重兵把守。末将虽愿远征，但需军粮与军心充沛。请主公莫行急躁不备之举。",
+    low: "师尊遗香仍在，然朝中谄媚之声日隆。主公若宠信奸佞、荒废武演，大汉社稷恐沦于司马氏之手！"
+  },
+  caocao: {
+    high: "天下英雄，唯主公与操耳！操征战半生，今日甘为将军出谋划策，横扫刘孙，一统寰宇！",
+    medium: "宁我负人，毋人负我。操眼里容不下沙子，主公若待操以至诚，操自待主公以霸术。",
+    low: "哼，竖子不足与谋！孤看你这优柔寡断之态，比袁绍有过之而无不及。真让孤失望透顶！"
+  },
+  luxun: {
+    high: "书生拜将，江东风流。主公宏图高远，伯言愿为主公统御水陆雄军，火烧连环，定鼎江山！",
+    medium: "夷陵一役，实乃逼上梁山。逊虽能守成，但主公切莫过度迷信水火偏招，根基在民。",
+    low: "朝中权贵相争，言路堵塞。主公若不纳逆耳忠言，任由外戚擅权，伯言恐将告病退隐归乡之草庐。"
+  }
+};
+
 interface GeneralRosterProps {
   recruitedIds: string[];
   playerStats: PlayerStats;
   onRecruitGeneral: (generalId: string) => void;
   onTrainGeneral: (generalId: string, goldCost: number, statGained: 'force' | 'intelligence' | 'leadership' | 'politics' | 'virtue', amount: number) => void;
+  onRetireGeneral: (generalId: string, legacyStatBonus: 'force' | 'intelligence' | 'leadership' | 'politics' | 'virtue', bonusAmount: number, generalName: string) => void;
 }
 
 // Detailed histories for major generals to display in the detailed biography overlay
@@ -254,12 +308,14 @@ export default function GeneralRoster({
   recruitedIds,
   playerStats,
   onRecruitGeneral,
-  onTrainGeneral
+  onTrainGeneral,
+  onRetireGeneral
 }: GeneralRosterProps) {
   const [activeTab, setActiveTab] = useState<'MY_GENERALS' | 'RECRUIT_POOL'>('MY_GENERALS');
   const [selectedGeneral, setSelectedGeneral] = useState<General | null>(null);
   const [trainingLog, setTrainingLog] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'WARRIOR' | 'STRATEGIST' | 'GOVERNOR'>('ALL');
+  const [retireStat, setRetireStat] = useState<'force' | 'intelligence' | 'leadership' | 'politics' | 'virtue'>('force');
 
   // Sorting & Compare & Biography state variables
   const [sortBy, setSortBy] = useState<'default' | 'force' | 'intelligence' | 'leadership' | 'politics' | 'virtue' | 'loyalty'>('default');
@@ -998,6 +1054,58 @@ export default function GeneralRoster({
                 <p className="text-[11px] text-[#2a2319] leading-relaxed">{displayGeneral.skillDesc}</p>
               </div>
 
+              {/* 名将心声语录 */}
+              <div id="general-quotes-card" className="mb-4">
+                <div className="text-[10px] uppercase font-mono font-bold text-stone-500 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">💬 名将语录 (General Quotes)</span>
+                  <span className="text-[9px] px-1.5 py-0.5 border rounded-none tracking-wider scale-95 font-serif font-bold">
+                    {recruitedSet.has(displayGeneral.id) 
+                      ? (displayGeneral.loyalty >= 85 ? "🔥 倾心赤诚" : displayGeneral.loyalty >= 60 ? "🛡️ 恪尽职守" : "⚠️ 军心动摇")
+                      : "🔒 锁定制"
+                    }
+                  </span>
+                </div>
+                {recruitedSet.has(displayGeneral.id) ? (
+                  (() => {
+                    const quotes = GENERAL_QUOTES[displayGeneral.id] || {
+                      high: "吾誓以死相随，辅佐主公清平天下！",
+                      medium: "食君之禄，担君之忧，末将定当竭心尽力。",
+                      low: "主公若荒废内政、克扣军饷，末将恐难以交代……"
+                    };
+                    const quoteText = displayGeneral.loyalty >= 85 
+                      ? quotes.high 
+                      : displayGeneral.loyalty >= 60 
+                        ? quotes.medium 
+                        : quotes.low;
+                    
+                    const borderStyle = displayGeneral.loyalty >= 85
+                      ? 'border-amber-600 bg-amber-50/50 shadow-xs'
+                      : displayGeneral.loyalty >= 60
+                        ? 'border-stone-400 bg-stone-50/60'
+                        : 'border-red-900/40 bg-red-100/30 animate-pulse';
+
+                    const textColor = displayGeneral.loyalty >= 85
+                      ? 'text-amber-950 font-semibold'
+                      : displayGeneral.loyalty >= 60
+                        ? 'text-stone-900'
+                        : 'text-stone-800 italic';
+
+                    return (
+                      <div className={`p-3 border rounded-none ${borderStyle} transition-all duration-300 relative overflow-hidden text-left`}>
+                        <span className="absolute -right-2 -bottom-4 text-7xl font-serif text-stone-300/35 font-black pointer-events-none select-none">“</span>
+                        <p className={`font-serif text-xs leading-relaxed ${textColor} relative z-10`}>
+                          “ {quoteText} ”
+                        </p>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div className="p-2.5 border border-dashed border-stone-300 bg-stone-100/40 text-[10px] text-stone-500 font-serif leading-relaxed italic text-left">
+                    📢 将领尚未招募入帐，难以倾听其胸腹之言。可在左侧面板核发黄金将其纳贤，方能聆听其名言宏愿与满腔赤诚！
+                  </div>
+                )}
+              </div>
+
               {/* Short Calligraphy biography text with Detail Button Overlay */}
               <div className="border border-artistic-charcoal/20 bg-artistic-cream/40 p-2.5 rounded-none text-[11px] text-stone-800 leading-normal mb-4">
                 <div className="flex gap-1 items-start mb-2">
@@ -1108,6 +1216,54 @@ export default function GeneralRoster({
                       </div>
                     )}
                   </div>
+
+                  {/* Retire General honorably */}
+                  <div className="border-t border-dashed border-stone-300 pt-3 mt-3">
+                    <h5 className="text-xs font-serif font-black text-stone-850 mb-1.5 flex items-center gap-1">
+                      📜 解甲归田 · 名将告老传承
+                    </h5>
+                    <p className="text-[10px] text-stone-600 font-serif leading-normal mb-2">
+                      允许将军告老还乡。退役后武将永久离开队伍，但他一生的功勋修行将永久转化为<b>「主公传承红利」</b>（使我军主帅或后续传承人的特定属性永久提升）！
+                    </p>
+                    
+                    {/* Choosing which legacy stat to inherit */}
+                    <div className="bg-[#f2efe4]/60 p-2 border border-amber-800/10 mb-2 flex flex-col gap-1.55">
+                      <div className="flex justify-between items-center text-[10.5px]">
+                        <span className="font-serif font-black text-amber-900">传承武学流派：</span>
+                        <span className="font-serif text-emerald-800 font-extrabold font-mono">
+                          预计提升 +{Math.max(1, Math.floor(displayGeneral.level * 1.5))}
+                        </span>
+                      </div>
+                      
+                      <select
+                        id="retire-stat-selector"
+                        value={retireStat}
+                        onChange={(e) => setRetireStat(e.target.value as any)}
+                        className="bg-white border border-stone-300 text-[10.5px] px-2 py-1 outline-none text-stone-900 font-serif"
+                      >
+                        <option value="force">🛡️ 传授百战猛将身手 (武力 +{Math.max(1, Math.floor(displayGeneral.level * 1.5))})</option>
+                        <option value="intelligence">📖 留赠密卷奇门谋略 (智力 +{Math.max(1, Math.floor(displayGeneral.level * 1.5))})</option>
+                        <option value="leadership">🚩 传承阵前列队列号 (统帅 +{Math.max(1, Math.floor(displayGeneral.level * 1.5))})</option>
+                        <option value="politics">🌾 梳理地方商税民生 (政治 +{Math.max(1, Math.floor(displayGeneral.level * 1.5))})</option>
+                        <option value="virtue">🤝 撒播贤明德政恩泽 (德行 +{Math.max(1, Math.floor(displayGeneral.level * 1.5))})</option>
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        const count = Math.max(1, Math.floor(displayGeneral.level * 1.5));
+                        const confirmed = window.confirm(`⚠️ 【退役引退确认】您确定要签署将军【${displayGeneral.name}】的解甲文牒吗？该良将将永久卸甲，不再入阵，其人所持功勋将化为【${retireStat === 'force' ? '武力' : retireStat === 'intelligence' ? '智力' : retireStat === 'leadership' ? '统帅' : retireStat === 'politics' ? '政治' : '德行'}】+${count} 永久红利附加到主公属相上。此项敕令属于太史局天鉴绝令，不能反悔退单！`);
+                        if (confirmed) {
+                          onRetireGeneral(displayGeneral.id, retireStat, count, displayGeneral.name);
+                          setSelectedGeneral(null); // Clear selection
+                        }
+                      }}
+                      className="w-full bg-orange-800/10 hover:bg-orange-850/15 border border-amber-800 text-amber-950 hover:text-amber-900 py-1.5 px-3 block text-center font-serif font-black text-xs transition-all cursor-pointer shadow-xs"
+                    >
+                      📜 准允呈请解甲，回馈传承红利
+                    </button>
+                  </div>
+
                 </div>
               ) : (
                 <div className="space-y-3">

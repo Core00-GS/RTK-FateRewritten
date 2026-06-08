@@ -20,6 +20,9 @@ import CivilianModsTab from './components/CivilianModsTab';
 import TrainingTab from './components/TrainingTab';
 import AnimatedCounter from './components/AnimatedCounter';
 import { sfx } from './utils/audio';
+import { migrateSaveData } from './utils/saveMigration';
+import { SOLAR_ACHIEVEMENTS } from './data/achievements';
+import HistoryTimelineD3 from './components/HistoryTimelineD3';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { 
   Skull, Sparkles, BookOpen, Map, Landmark, Users, 
@@ -188,9 +191,63 @@ const calculateEndingEvaluation = (stats: PlayerStats, recruitedCount: number, s
   return { score: totalScore, grade, feedback };
 };
 
+// 权衡评估智能标记反馈 (Dynamically assesses decision weight as user feedback)
+const getEvaluationHint = (opt: any): string => {
+  if (opt.evaluationHint) {
+    return opt.evaluationHint;
+  }
+  
+  // Trace requirement checks
+  if (opt.requirement) {
+    const req = opt.requirement;
+    if (req.attribute === 'force') return `⚖️ 评估：对宿卫武将勇力要求较高 (需武力 ≥ ${req.minVal})`;
+    if (req.attribute === 'intelligence') return `🔮 评估：极重军师权变与智略决策 (需智谋 ≥ ${req.minVal})`;
+    if (req.attribute === 'leadership') return `♟️ 评估：极度抗压，考验主帅治军魄力 (需统帅 ≥ ${req.minVal})`;
+    if (req.attribute === 'prestige') return `👑 评估：海内人望，需要名门极重声威 (需声望 ≥ ${req.minVal})`;
+    if (req.attribute === 'virtue') return `🕊️ 评估：大汉民望，深得百姓与仁人拥簇 (需仁德 ≥ ${req.minVal})`;
+    if (req.attribute === 'politics') return `📜 评估：庙堂谋略，极其考验内政手腕 (需政治 ≥ ${req.minVal})`;
+  }
+  
+  // Trace stat change effects
+  if (opt.effect && opt.effect.statChanges) {
+    const sc = opt.effect.statChanges;
+    const items: string[] = [];
+    if (sc.troops && sc.troops < 0) items.push('兵卒折损');
+    if (sc.troops && sc.troops > 0) items.push('扩借劲骑');
+    if (sc.gold && sc.gold < 0) items.push('耗用饷银');
+    if (sc.gold && sc.gold > 0) items.push('搜括赋金');
+    if (sc.virtue && sc.virtue < 0) items.push('可能导致民心下降');
+    if (sc.virtue && sc.virtue > 0) items.push('收取海内民心');
+    if (sc.addDeviance && sc.addDeviance > 0) items.push('偏轨信史');
+    
+    if (items.length > 0) {
+      return `📊 权衡：此选多会导致【${items.join(' 与 ')}】等政绩演化`;
+    }
+  }
+  
+  // Trace text description keywords
+  const txt = opt.text || '';
+  if (txt.includes('攻') || txt.includes('战') || txt.includes('斩') || txt.includes('杀') || txt.includes('击')) {
+    return '⚔️ 权衡：决战于两军之间，以力服人，兵势首重';
+  }
+  if (txt.includes('守') || txt.includes('退') || txt.includes('避') || txt.includes('屯') || txt.includes('歇')) {
+    return '🛡️ 权衡：安民保卒，蓄锐持重，保存宿卫元气';
+  }
+  if (txt.includes('说') || txt.includes('辨') || txt.includes('谋') || txt.includes('书') || txt.includes('贤')) {
+    return '🔮 权衡：舌战博辩，智谋周旋，策士偏门大有可为';
+  }
+  if (txt.includes('金') || txt.includes('粮') || txt.includes('赋') || txt.includes('商') || txt.includes('饷')) {
+    return '🌱 权衡：涉及库帑辎重分配，影响军饷及民生漕运';
+  }
+  
+  return '⚖️ 权衡：利弊相生，成败自如，存乎主公一念之间';
+};
+
 export default function App() {
   // --- Game Session State ---
-  const [gameState, setGameState] = useState<'MAIN_MENU' | 'INTRO' | 'STORY' | 'MAP' | 'ROSTER' | 'GOV' | 'DIPLOMACY' | 'RANDOM_EVENTS' | 'CIVILIAN_MODS' | 'SIDE_QUESTS' | 'ARCHIVE' | 'ENDING' | 'TRAINING'>('MAIN_MENU');
+  const [gameState, setGameState] = useState<'MAIN_MENU' | 'INTRO' | 'STORY' | 'MAP' | 'ROSTER' | 'GOV' | 'DIPLOMACY' | 'RANDOM_EVENTS' | 'CIVILIAN_MODS' | 'SIDE_QUESTS' | 'ARCHIVE' | 'ENDING' | 'TRAINING' | 'ACHIEVEMENTS'>('MAIN_MENU');
+  const [regionAnnotations, setRegionAnnotations] = useState<Record<string, string>>({});
+  const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
   
   // --- Multi-playthrough (Weeks) SSS Bonus ---
   const [sssBonusPoints, setSssBonusPoints] = useState<number>(() => {
@@ -290,7 +347,9 @@ export default function App() {
   const [historyRecords, setHistoryRecords] = useState<HistoryRecord[]>([]);
   const [expandedHistoryFacts, setExpandedHistoryFacts] = useState<Record<string, boolean>>({});
   const [archiveSearch, setArchiveSearch] = useState<string>('');
+  const [archiveSubTab, setArchiveSubTab] = useState<'CHRONICLES' | 'CALENDAR' | 'TIMELINE'>('CHRONICLES');
   const [activeStance, setActiveStance] = useState<'BALANCED' | 'OFFENSIVE' | 'DEFENSIVE'>('BALANCED');
+  const [battleFormation, setBattleFormation] = useState<'TORTOISE' | 'PHALANX' | 'ARCHER_WALL'>('TORTOISE');
   const [taxCooldown, setTaxCooldown] = useState<boolean>(false);
   const [playerLocation, setPlayerLocation] = useState<string>('zhuojun');
   const [exploredRegions, setExploredRegions] = useState<string[]>(['zhuojun']);
@@ -314,25 +373,130 @@ export default function App() {
   const [battleLogFilter, setBattleLogFilter] = useState<'all' | 'action' | 'casualty' | 'gain' | 'random_event'>('all');
 
   // --- Battle Log Impact Animation State ---
-  const [battleLogAnim, setBattleLogAnim] = useState<'none' | 'shake' | 'flash'>('none');
+  const [battleLogAnim, setBattleLogAnim] = useState<'none' | 'shake' | 'strong-shake' | 'flash'>('none');
 
-  const prevLogsLength = useRef<number>(1);
+  // --- Battlefield Tricks Stances ---
+  const [activeTrick, setActiveTrick] = useState<'backwater' | 'cicada' | null>(null);
+  const [trickCooldown, setTrickCooldown] = useState<number>(0); // 0 to 100 for progress percent
+  const [trickSecondsLeft, setTrickSecondsLeft] = useState<number>(0); // countdown seconds
+
+  // --- Option Pagination State ---
+  const [optionPage, setOptionPage] = useState<number>(0);
+
+  // --- Selected Temporal Conflict Record for Modal Details ---
+  const [selectedConflictRecord, setSelectedConflictRecord] = useState<{
+    record: HistoryRecord;
+    conflictInfo: {
+      isConflict: boolean;
+      type: 'maicheng' | 'wuzhang';
+      realYear: number;
+      currentYear: string | number;
+      pairEvent: string;
+      pairRealYear: number;
+      conflictReason: string;
+    }
+  } | null>(null);
+
+  // Calculate cumulative battle statistics for the current chapter
+  const getChapterStats = () => {
+    let troopsLost = 0;
+    let goldSpent = 0;
+    let enemiesDefeated = 0;
+
+    battleLogs.forEach(log => {
+      if (log.chapterId !== currentChapterId) return;
+      const msg = log.message || '';
+
+      // Pattern matcher for troops lost
+      const troopPattern = msg.match(/[折损减少损耗跌落]-\s*(\d+)/i) || 
+                           msg.match(/折损\s*(\d+)\s*兵卒/i) || 
+                           msg.match(/折损\s*(\d+)\s*人/i) || 
+                           msg.match(/损折\s*(\d+)\s*兵卒/i) ||
+                           msg.match(/多折\s*(\d+)\s*兵卒/i) ||
+                           msg.match(/折兵\s*(\d+)/) ||
+                           msg.match(/免折\s*(\d+)人/) ||
+                           msg.match(/-\s*(\d+) 我兵/) ||
+                           msg.match(/-\s*(\d+) 盾防/) ||
+                           msg.match(/-\s*(\d+) 本兵/) ||
+                           msg.match(/-\s*(\d+) 卫兵/) ||
+                           msg.match(/兵卒额外折多\s*(\d+)/) ||
+                           msg.match(/折损\s*(\d+)\s*兵马/);
+      if (troopPattern) {
+        troopsLost += parseInt(troopPattern[1], 10);
+      } else if (log.type === 'casualty') {
+        const m = msg.match(/(\d+)/);
+        if (m) troopsLost += parseInt(m[1], 10);
+      }
+
+      // Pattern matcher for gold spent
+      const goldPattern = msg.match(/-\s*(\d+)\s*黄金/) || 
+                          msg.match(/扣除\s*(\d+)\s*黄金/) || 
+                          msg.match(/耗费\s*(\d+)\s*黄金/) || 
+                          msg.match(/消耗\s*(\d+)\s*黄金/) ||
+                          msg.match(/花费\s*(\d+)\s*黄金/) ||
+                          msg.match(/核发黄金\s*(\d+)/) ||
+                          msg.match(/克扣饷银\s*(\d+)/) ||
+                          msg.match(/金极\s*-?(\d+)/);
+      if (goldPattern) {
+        goldSpent += parseInt(goldPattern[1], 10);
+      }
+
+      // Pattern matcher for enemies defeated
+      const enemyPattern = msg.match(/歼敌\s*(\d+)/) || 
+                           msg.match(/杀敌\s*(\d+)/) || 
+                           msg.match(/斩敌\s*(\d+)/) || 
+                           msg.match(/-\s*(\d+)\s*敌卒/) ||
+                           msg.match(/-\s*(\d+)\s*敌兵/) ||
+                           msg.match(/-\s*(\d+)\s*敌/);
+      if (enemyPattern) {
+        enemiesDefeated += parseInt(enemyPattern[1], 10);
+      }
+    });
+
+    return {
+      troopsLost,
+      goldSpent,
+      enemiesDefeated
+    };
+  };
+
+  const processedLogIds = useRef<Set<string>>(new Set(['init_log']));
   useEffect(() => {
-    if (battleLogs && battleLogs.length > prevLogsLength.current) {
-      const latestLog = battleLogs[0];
-      if (latestLog && latestLog.id !== 'init_log') {
-        if (latestLog.type === 'casualty') {
-          setBattleLogAnim('shake');
-          const t = setTimeout(() => setBattleLogAnim('none'), 400);
-          return () => clearTimeout(t);
-        } else if (latestLog.type === 'gain') {
+    if (!battleLogs) return;
+    const newLogs = battleLogs.filter(log => !processedLogIds.current.has(log.id));
+    if (newLogs.length > 0) {
+      newLogs.forEach(log => processedLogIds.current.add(log.id));
+
+      const hasCasualty = newLogs.some(log => log.type === 'casualty');
+      const hasGain = newLogs.some(log => log.type === 'gain');
+
+      if (hasCasualty) {
+        const highDamage = newLogs.some(log => {
+          if (log.type !== 'casualty') return false;
+          // Look for any casualty numbers representing high loss (>= 150)
+          const match = log.message.match(/(\d+)/);
+          return match ? parseInt(match[1], 10) >= 150 : false;
+        });
+
+        const animType = highDamage ? 'strong-shake' : 'shake';
+        setBattleLogAnim('none');
+        const resetT = setTimeout(() => {
+          setBattleLogAnim(animType);
+          const clearT = setTimeout(() => setBattleLogAnim('none'), animType === 'strong-shake' ? 500 : 400);
+          return () => clearTimeout(clearT);
+        }, 15);
+        return () => clearTimeout(resetT);
+
+      } else if (hasGain) {
+        setBattleLogAnim('none');
+        const resetT = setTimeout(() => {
           setBattleLogAnim('flash');
-          const t = setTimeout(() => setBattleLogAnim('none'), 500);
-          return () => clearTimeout(t);
-        }
+          const clearT = setTimeout(() => setBattleLogAnim('none'), 500);
+          return () => clearTimeout(clearT);
+        }, 15);
+        return () => clearTimeout(resetT);
       }
     }
-    prevLogsLength.current = battleLogs ? battleLogs.length : 1;
   }, [battleLogs]);
 
   // --- Story Decision Countdown Timer ---
@@ -406,6 +570,128 @@ export default function App() {
     }
   }, [toast]);
 
+  // --- Battlefield Tricks Active Handler ---
+  useEffect(() => {
+    if (activeTrick) {
+      const durationMs = 6000; // 6 seconds duration
+      let elapsedMs = 0;
+      const interval = setInterval(() => {
+        elapsedMs += 100;
+        const progress = Math.max(0, 100 - (elapsedMs / durationMs) * 100);
+        setTrickCooldown(progress);
+        setTrickSecondsLeft(Math.ceil((durationMs - elapsedMs) / 1000));
+        
+        if (elapsedMs >= durationMs) {
+          clearInterval(interval);
+          const oldTrick = activeTrick;
+          setActiveTrick(null);
+          setTrickCooldown(0);
+          setTrickSecondsLeft(0);
+          showToast(`⚙️ 【战法收招】『${oldTrick === 'backwater' ? '背水一战' : '金蝉脱壳'}』专注期已过，主公三军回归常指挥！`);
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  }, [activeTrick]);
+
+  // Trick Click Handlers
+  const handleBackwaterTrick = () => {
+    if (activeTrick) {
+      showToast('⚠️ 主公当前处于另一项特技专注指挥中，分身乏术！');
+      return;
+    }
+    sfx.playClick();
+    setActiveTrick('backwater');
+    setTrickCooldown(100);
+    setTrickSecondsLeft(6);
+    
+    const trickLog = {
+      id: `trick_${Date.now()}`,
+      chapterId: currentChapterId,
+      timestamp: `公元${playerStats.year}年${playerStats.month}月${playerStats.day}日`,
+      message: `⚔️ 【战法·背水一战】主公绝地高呼破釜沉舟，全军死地求生，兵马气势冲天，战意狂飙！额外加注局部战损吸收！`,
+      type: 'action' as const
+    };
+    setBattleLogs(prev => [trickLog, ...prev]);
+    setPlayerStats(prev => ({ ...prev, force: prev.force + 2, prestige: prev.prestige + 10 }));
+    showToast('⚔️ 【绝境死战】背水一战爆发！6秒内主公需全神贯注指挥死斗，禁止下达其他主线玺令。');
+  };
+
+  const handleCicadaTrick = () => {
+    if (activeTrick) {
+      showToast('⚠️ 主公当前处于另一项特技专注指挥中，分身乏术！');
+      return;
+    }
+    sfx.playClick();
+    setActiveTrick('cicada');
+    setTrickCooldown(100);
+    setTrickSecondsLeft(6);
+
+    const trickLog = {
+      id: `trick_${Date.now()}`,
+      chapterId: currentChapterId,
+      timestamp: `公元${playerStats.year}年${playerStats.month}月${playerStats.day}日`,
+      message: `🕊️ 【战法·金蝉脱壳】主公巧施空堡障眼之策，设悬幡疑兵徐徐退走。避其敌国重锋，召得散勇归队！`,
+      type: 'gain' as const
+    };
+    setBattleLogs(prev => [trickLog, ...prev]);
+    setPlayerStats(prev => ({ ...prev, troops: prev.troops + 200, intelligence: prev.intelligence + 1 }));
+    showToast('🕊️ 【金蝉脱壳】遁守之计施演！6秒内主公潜行撤隐，暂避锋芒，禁止下达其他主线玺令。');
+  };
+
+  // Timeline anomaly detection helpers
+  const detectTimeConflict = (rec: HistoryRecord, allRecs: HistoryRecord[]) => {
+    const isMaicheng = rec.title.includes('麦城') || rec.brief.includes('麦城') || rec.title.includes('关羽');
+    const isWuzhang = rec.title.includes('五丈原') || rec.brief.includes('五丈原') || rec.title.includes('诸葛') || rec.title.includes('孔明');
+    
+    if (isMaicheng || isWuzhang) {
+      const hasMaichengPair = allRecs.some(r => r.id !== rec.id && (r.title.includes('麦城') || r.brief.includes('麦城') || r.title.includes('关羽')));
+      const hasWuzhangPair = allRecs.some(r => r.id !== rec.id && (r.title.includes('五丈原') || r.brief.includes('五丈原') || r.title.includes('诸葛') || r.title.includes('孔明')));
+      
+      if (hasMaichengPair && hasWuzhangPair) {
+        const getYear = (ts: string) => {
+          const match = ts.match(/公元\s*(\d+)\s*年/);
+          return match ? parseInt(match[1]) : null;
+        };
+        const recYear = getYear(rec.timestamp);
+        return {
+          isConflict: true,
+          type: isMaicheng ? 'maicheng' as const : 'wuzhang' as const,
+          realYear: isMaicheng ? 219 : 234,
+          currentYear: recYear || '未知',
+          pairEvent: isMaicheng ? '诸葛亮五丈原' : '关羽麦城受困',
+          pairRealYear: isMaicheng ? 234 : 219,
+          conflictReason: `在真实正史中，武圣败走麦城（公元219年）与诸葛武侯五丈原星落（公元234年）相隔整整15年之久，具有明确的因果继承关系。然而在阁下逆天改命的全新非线性宇宙中，这两大悲情节点由于您打破宿命，在同个纪年 ${rec.timestamp} 中并存重叠，发生了深刻的因果倒错，使史册产生非线性的时空交错。`
+        };
+      }
+    }
+    return null;
+  };
+
+  const injectTemporalConflictMocks = () => {
+    sfx.playClick();
+    const mockRec1: HistoryRecord = {
+      id: 'mock_maicheng_conflict',
+      timestamp: '公元184年秋',
+      title: '关羽大意麦城受困',
+      brief: '由于历史线极度偏离，本应在公元219年发生的麦城受困，竟然在汉中义勇军起兵不久的公元184年早早重叠激活。吕蒙白衣渡江渡了空，你领大军破阵，突围救下关云长！',
+      isAltered: true
+    };
+    const mockRec2: HistoryRecord = {
+      id: 'mock_wuzhang_conflict',
+      timestamp: '公元184年秋',
+      title: '诸葛亮五丈原续命',
+      brief: '本应在公元234年病卒于五丈原荒岗之上的诸葛亮，在同一个公元184年事件中，于你的阵前同时油尽灯枯。你拼着己身根基施展了夺天北斗延寿星仪，武侯自此再延寿十二载！',
+      isAltered: true
+    };
+    
+    setHistoryRecords(prev => {
+      const cleaned = prev.filter(r => r.id !== 'mock_maicheng_conflict' && r.id !== 'mock_wuzhang_conflict');
+      return [mockRec1, mockRec2, ...cleaned];
+    });
+    showToast('🔮 【逆天·时空裂化检测】大事记中已成功注入“公元184年”同时出现的麦城与五丈原模拟数据！快往下查阅和比对真实历史走向吧！');
+  };
+
   // Intercept window.alert for sandboxed iframe environments
   useEffect(() => {
     const originalAlert = window.alert;
@@ -427,6 +713,11 @@ export default function App() {
     }
   }, [currentSceneId, gameState]);
 
+  // Reset option page whenever scene ID changes
+  useEffect(() => {
+    setOptionPage(0);
+  }, [currentSceneId]);
+
   // --- Daily Quests Refresh Effect (And updates available quests of the date) ---
   useEffect(() => {
     const isNewDay = playerStats.day !== lastCheckedDate.day || 
@@ -436,6 +727,39 @@ export default function App() {
     if (isNewDay && playerStats.day > 0) {
       const REGION_IDS = ['zhuojun', 'beihai', 'yecheng', 'luoyang', 'changan', 'xiongnu', 'chengdu', 'xiangyang', 'jianye'];
       
+      const lastDays = lastCheckedDate.year * 360 + lastCheckedDate.month * 30 + lastCheckedDate.day;
+      const currentDays = playerStats.year * 360 + playerStats.month * 30 + playerStats.day;
+      const elapsedDays = Math.max(0, currentDays - lastDays);
+
+      // Handle Automatic Infrastructure Investment Passive Returns
+      const investmentGold = playerStats.autoDevelopmentGold || 0;
+      if (investmentGold > 0 && elapsedDays > 0) {
+        // Triggers passive gold income increase: +Math.max(1, Math.floor(investmentGold * 0.02)) per 10 days
+        const intervals = Math.floor(elapsedDays / 10) || 1;
+        const rewardPassiveInc = Math.max(1, Math.floor(investmentGold * 0.02)) * intervals;
+        
+        // Return 5% of investment value as direct liquid cash dividend return per turn cycle
+        const rewardLiquidDividend = Math.max(1, Math.floor(investmentGold * 0.05)) * intervals;
+        
+        setPlayerStats(prev => ({
+          ...prev,
+          gold: prev.gold + rewardLiquidDividend,
+          autoDevelopmentPassiveIncome: (prev.autoDevelopmentPassiveIncome || 0) + rewardPassiveInc
+        }));
+
+        const dateStr = `第${playerStats.year}年 ${playerStats.month}月 ${playerStats.day}日`;
+        const investLog = {
+          id: `auto_dev_${Date.now()}_${Math.random()}`,
+          timestamp: dateStr,
+          message: `🌾 【被动产业投资】历经长途治理 (${elapsedDays} 天)，由您拨付的 ${investmentGold} 屯垦商行基金获得丰美成效。地方被动岁入常态增加 +${rewardPassiveInc} 钱粮，且获得 +${rewardLiquidDividend} 现银红利作为商税即时回流！`,
+          type: 'gain' as const
+        };
+        setTimeout(() => {
+          setBattleLogs(prev => [investLog, ...prev]);
+        }, 100);
+        showToast(`🌾 被动基建产出：获得 🪙 +${rewardLiquidDividend} 黄金股息！`);
+      }
+
       setQuestsList(prevQuests => {
         return prevQuests.map(q => {
           // Keep completed quests intact
@@ -480,6 +804,68 @@ export default function App() {
     setToast(msg);
   };
 
+  // --- Solar Terms Achievement Auto-evaluator ---
+  useEffect(() => {
+    if (gameState === 'MAIN_MENU' || gameState === 'INTRO') return;
+    
+    const matchedIds: string[] = [];
+    const m = playerStats.month;
+    const isM1 = m === 1 && playerStats.troops > 0 && playerStats.troops < 1500;
+    const isM2 = m === 2 && playerStats.popularity >= 85;
+    const isM3 = m === 3 && playerStats.intelligence >= 90;
+    const isM4 = m === 4 && playerStats.gold >= 450;
+    const isM5 = m === 5 && playerStats.force >= 90;
+    const isM6 = m === 6; // Solstice travel auto-trigger
+    const isM7 = m === 7 && playerStats.troops >= 12000;
+    const isM8 = m === 8 && playerStats.gold >= 400; // Standalone winter pre harvest
+    const isM9 = m === 9 && recruitedGenerals.length >= 4;
+    const isM10 = m === 10 && playerStats.virtue >= 85;
+    const isM11 = m === 11 && (playerStats.deviance !== undefined ? playerStats.deviance > 50 : true);
+    const isM12 = m === 12 && playerStats.prestige >= 85;
+
+    if (isM1) matchedIds.push('ach_major_cold');
+    if (isM2) matchedIds.push('ach_spring_beginning');
+    if (isM3) matchedIds.push('ach_insects_awakening');
+    if (isM4) matchedIds.push('ach_pure_brightness');
+    if (isM5) matchedIds.push('ach_summer_beginning');
+    if (isM6) matchedIds.push('ach_summer_solstice');
+    if (isM7) matchedIds.push('ach_major_heat');
+    if (isM8) matchedIds.push('ach_autumn_beginning');
+    if (isM9) matchedIds.push('ach_autumn_equinox');
+    if (isM10) matchedIds.push('ach_winter_beginning');
+    if (isM11) matchedIds.push('ach_winter_solstice');
+    if (isM12) matchedIds.push('ach_minor_cold');
+
+    const newUnlocks = matchedIds.filter(id => !unlockedAchievements.includes(id));
+    if (newUnlocks.length > 0) {
+      setUnlockedAchievements(prev => {
+        const next = [...prev, ...newUnlocks];
+        // Automatically persist
+        try {
+          const cached = localStorage.getItem(SAVE_KEY);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            parsed.unlockedAchievements = next;
+            localStorage.setItem(SAVE_KEY, JSON.stringify(parsed));
+          }
+        } catch(e) {
+          console.error(e);
+        }
+        return next;
+      });
+
+      newUnlocks.forEach(id => {
+        const matching = SOLAR_ACHIEVEMENTS.find(a => a.id === id);
+        if (matching) {
+          setTimeout(() => {
+            sfx.playFanfare(true);
+            showToast(`🏅【成就殿堂】恭喜主公解锁『${matching.termName.split(' ')[0]} · ${matching.title}』岁华成就！功德昭雪，千秋留名。`);
+          }, 300);
+        }
+      });
+    }
+  }, [playerStats, recruitedGenerals, unlockedAchievements, gameState]);
+
   // Load game from cache on initial load
   useEffect(() => {
     const cached = localStorage.getItem(SAVE_KEY);
@@ -499,6 +885,7 @@ export default function App() {
   // --- Save / Load Handlers ---
   const saveGame = () => {
     const data = {
+      version: '2.0',
       stats: playerStats,
       recruitedGenerals,
       completedQuests,
@@ -511,6 +898,8 @@ export default function App() {
       playerLocation,
       gameState,
       exploredRegions,
+      annotations: regionAnnotations,
+      unlockedAchievements,
       relations: diplomacyRelations,
       questsList,
       lastCheckedDate,
@@ -526,6 +915,7 @@ export default function App() {
     const sssPoints = localStorage.getItem('three_kingdoms_sss_bonus_points') || '0';
     const data = {
       saveData: {
+        version: '2.0',
         stats: playerStats,
         recruitedGenerals,
         completedQuests,
@@ -538,6 +928,8 @@ export default function App() {
         playerLocation,
         gameState,
         exploredRegions,
+        annotations: regionAnnotations,
+        unlockedAchievements,
         relations: diplomacyRelations,
         questsList,
         lastCheckedDate,
@@ -573,33 +965,49 @@ export default function App() {
     reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
-        if (!parsed || !parsed.saveData || typeof parsed.sssPoints !== 'number') {
+        if (!parsed) {
+          showToast("❌ 导入存档格式不合规！该文件无法解析。");
+          return;
+        }
+
+        // Automatic old archive compatibility inspection and migration
+        const { migrated, wasMigrated } = migrateSaveData(parsed, INITIAL_REGIONS);
+        if (!migrated || !migrated.stats) {
           showToast("❌ 导入存档格式不合规！该文件非合法的逆天改命录存档。");
           return;
         }
 
-        const data = parsed.saveData;
+        const data = migrated;
         setPlayerStats(data.stats);
         setRecruitedGenerals(data.recruitedGenerals || []);
         setCompletedQuests(data.completedQuests || []);
         setActiveQuests(data.activeQuests || []);
-        setRegions(data.regions || []);
-        setCurrentSceneId(data.currentSceneId || 's1');
+        setRegions(data.regions || INITIAL_REGIONS);
+        setCurrentSceneId(data.currentSceneId || 'c1_0');
         setCurrentChapterId(data.currentChapterId || 'c1');
         setHistoryRecords(data.historyRecords || []);
         setTaxCooldown(data.taxCooldown !== undefined ? data.taxCooldown : false);
         setPlayerLocation(data.playerLocation || 'v1');
         setExploredRegions(data.exploredRegions || []);
+        setRegionAnnotations(data.annotations || {});
+        setUnlockedAchievements(data.unlockedAchievements || []);
         setDiplomacyRelations(data.relations || {});
         setQuestsList(data.questsList || []);
         setLastCheckedDate(data.lastCheckedDate || { year: 177, month: 1, day: 1 });
-        setRunId(data.runId || Date.now());
+        setRunId(data.runId || 'run_' + Date.now());
 
-        localStorage.setItem('three_kingdoms_sss_bonus_points', parsed.sssPoints.toString());
-        setSssBonusPoints(parsed.sssPoints);
+        const pts = typeof parsed.sssPoints === 'number' ? parsed.sssPoints : 0;
+        localStorage.setItem('three_kingdoms_sss_bonus_points', pts.toString());
+        setSssBonusPoints(pts);
+
         localStorage.setItem(SAVE_KEY, JSON.stringify(data));
 
-        showToast("📥 【太史令本】宿愿大簿导入大成！已恢复您的一世宏图天命！");
+        if (wasMigrated) {
+          showToast("🎉 【太史令本】成功将旧本纪大簿迁移至当前的 V2 架构并顺利导入天命！");
+        } else {
+          showToast("📥 【太史令本】宿愿大簿导入大成！已恢复您的一世宏图天命！");
+        }
+
         if (data.gameState && data.gameState !== 'INTRO' && data.gameState !== 'MAIN_MENU') {
           setGameState(data.gameState);
         } else {
@@ -658,7 +1066,12 @@ export default function App() {
       return;
     }
     try {
-      const data = JSON.parse(cached);
+      const parsed = JSON.parse(cached);
+      
+      // Perform automated V2 version compatibility check and data migration
+      const { migrated, wasMigrated } = migrateSaveData(parsed, INITIAL_REGIONS);
+      const data = migrated;
+
       setPlayerStats(data.stats);
       setRecruitedGenerals(data.recruitedGenerals || []);
       setCompletedQuests(data.completedQuests || []);
@@ -668,8 +1081,10 @@ export default function App() {
       setCurrentChapterId(data.currentChapterId || 'c1');
       setHistoryRecords(data.historyRecords || []);
       setTaxCooldown(data.taxCooldown !== undefined ? data.taxCooldown : false);
-      setPlayerLocation(data.playerLocation || 'zhuojun');
-      setExploredRegions(data.exploredRegions || ['zhuojun']);
+      setPlayerLocation(data.playerLocation || 'v1');
+      setExploredRegions(data.exploredRegions || []);
+      setRegionAnnotations(data.annotations || {});
+      setUnlockedAchievements(data.unlockedAchievements || []);
       setGameState(data.gameState || 'STORY');
       if (data.relations) {
         setDiplomacyRelations(data.relations);
@@ -685,9 +1100,16 @@ export default function App() {
       } else {
         setRunId('run_' + Date.now());
       }
-      showToast("【旧案调阅】成功寻回原定乾坤行纪。主公，还请再度发敕！");
+
+      if (wasMigrated) {
+        // Persist the migrated V2 data back to local storage
+        localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+        showToast("🔔 【乾坤勘误】检测到旧本纪残篇，已自动归拢升格至 V2 标准案卷并读入！");
+      } else {
+        showToast("【旧案调阅】成功寻回原定乾坤行纪。主公，还请再度发敕！");
+      }
     } catch (e) {
-      showToast("读取大业案底时发生绌，档案可能有所污损。");
+      showToast("读取大业案底时发生错误，档案可能有所污损。");
     }
   };
 
@@ -1118,6 +1540,14 @@ export default function App() {
   };
 
   const handleOptionSelect = (option: any) => {
+    if (activeTrick) {
+      showToast(`⚔️ 【特技专注中】『${activeTrick === 'backwater' ? '背水一战' : '金蝉脱壳'}』战法法阵生效，主公当前无法改变主线玺令决策！`);
+      return;
+    }
+    
+    // Reset option pagination for the next scene
+    setOptionPage(0);
+
     const effect = option.effect;
 
     // Check optional option requirements with difficulty changes 
@@ -1280,7 +1710,10 @@ export default function App() {
     const activeScene = GAME_SCENES[currentSceneId];
     const hasOptions = activeScene && activeScene.options && activeScene.options.length > 0;
 
-    if (gameState === 'STORY' && hasOptions && !lastOutcome) {
+    // Only apply countdown timer in hard difficulty (困难难度)
+    const isHardDifficulty = playerStats && playerStats.difficulty === 'hard';
+
+    if (isHardDifficulty && gameState === 'STORY' && hasOptions && !lastOutcome) {
       if (storyTimer === null) {
         setStoryTimer(25); // 25 seconds duration
       } else if (storyTimer > 0) {
@@ -1299,7 +1732,7 @@ export default function App() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [gameState, currentSceneId, lastOutcome, storyTimer]);
+  }, [gameState, currentSceneId, lastOutcome, storyTimer, playerStats.difficulty]);
 
   // --- Trigger Game Over if troops <= 0 while playing ---
   useEffect(() => {
@@ -1504,6 +1937,40 @@ export default function App() {
     setBattleLogs(prev => [msg, ...prev]);
   };
 
+  // --- Honorable General Retirement ---
+  const handleRetireGeneral = (
+    generalId: string,
+    stat: 'force' | 'intelligence' | 'leadership' | 'politics' | 'virtue',
+    bonusValue: number,
+    generalName: string
+  ) => {
+    sfx.playDrum();
+    
+    // Remove from recruited list
+    setRecruitedGenerals(prev => prev.filter(id => id !== generalId));
+    
+    // Supplement PlayerStats permanently
+    setPlayerStats(prev => {
+      const advanced = advanceTime(5, prev); // Advancing 5 days for administrative settlement or handovers
+      return {
+        ...prev,
+        ...advanced,
+        [stat]: (prev[stat] || 0) + bonusValue
+      };
+    });
+
+    const dateStr = `公元${playerStats.year}年${playerStats.month}月${playerStats.day}日`;
+    const retireLog = {
+      id: `retire_${Date.now()}`,
+      chapterId: currentChapterId,
+      timestamp: dateStr,
+      message: `📜 【名将荣退】主公核发盖御宝印的退役敕令：良将【${generalName}】功成卸甲。其毕生武学造诣化为「传承红利」，永久提升主公五维：【${stat === 'force' ? '武力' : stat === 'intelligence' ? '智力' : stat === 'leadership' ? '统帅' : stat === 'politics' ? '政治' : '德行'}】 +${bonusValue}！大德浩荡！`,
+      type: 'gain' as const
+    };
+    setBattleLogs(prev => [retireLog, ...prev]);
+    showToast(`📜 【传承红利】属性永久提升 +${bonusValue}！`);
+  };
+
   // --- Economic governance updates ---
   const handleGovAction = (
     actionType: 'RECRUIT' | 'TILLAGE' | 'RELIEF' | 'ARMAMENT',
@@ -1630,6 +2097,27 @@ export default function App() {
           const extra = Math.round(lossTroops * 0.15);
           actualLoss = lossTroops + extra;
           showToast(`🏹 【锋矢阵·过突溃损】校勇一味突击冒进遭遇反切，溃败中额外折多 15% 兵卒 (多折 ${extra} 人)！`);
+        }
+
+        // Apply Tactical Preference (Hidden Parameter scaling)
+        const savedPref = localStorage.getItem('tk_tactical_preference') || 'ATTACK';
+        let prefLogExtra = '';
+        if (savedPref === 'ATTACK') {
+          const attackExtra = Math.round(actualLoss * 0.10);
+          actualLoss += attackExtra;
+          prefLogExtra = ` (⚡ 强攻秘策：因奉行搏杀战术，战损承载额外多增 10% [多折 ${attackExtra} 人])`;
+        } else if (savedPref === 'DEFEND') {
+          const defendSaved = Math.round(actualLoss * 0.15);
+          actualLoss = Math.max(0, actualLoss - defendSaved);
+          prefLogExtra = ` (🛡️ 稳守秘策：兵马缓防列阵，额外豁免折损 15% [少折 ${defendSaved} 人])`;
+        } else if (savedPref === 'AMBUSH') {
+          const ambushSaved = Math.round(actualLoss * 0.05);
+          actualLoss = Math.max(0, actualLoss - ambushSaved);
+          prefLogExtra = ` (⚡ 偷袭秘策：奇袭回撤，兵卒减员降低 5% [少折 ${ambushSaved} 人])`;
+        }
+
+        if (prefLogExtra) {
+          showToast(`🎯 【临阵意志偏好】${prefLogExtra}`);
         }
 
         setPlayerStats(prev => ({
@@ -1843,6 +2331,17 @@ export default function App() {
                   📖 班师恢复大业 (继续昨日)
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  sfx.playClick();
+                  setGameState('ACHIEVEMENTS');
+                }}
+                className="w-full bg-[#f4ebd0] border-2 border-[#8c7e6c] hover:bg-amber-100 text-[#5c0f11] py-4 px-6 rounded-none font-serif font-black text-sm tracking-widest transition-all duration-300 shadow-md flex items-center justify-center gap-3 cursor-pointer group"
+              >
+                🏅 登临「成就殿堂」
+              </button>
 
               {/* Multi-run inheritance display */}
               <div className="bg-artistic-bg border border-artistic-charcoal/20 p-4 rounded-none text-left font-serif">
@@ -2267,7 +2766,18 @@ export default function App() {
 
                   {/* Operational Decision selection matrix */}
                   <div className="border-t border-artistic-charcoal pt-4">
-                    {storyTimer !== null && (
+                    {/* Active focus stance warning card */}
+                    {activeTrick && (
+                      <div className="mb-4 bg-[#8b0000]/5 border-2 border-artistic-crimson p-3 font-serif rounded-none flex items-start gap-2.5 animate-pulse">
+                        <span className="text-lg leading-none shrink-0 text-artistic-crimson">⚔️</span>
+                        <div className="text-[11.5px] text-artistic-crimson">
+                          <p className="font-bold">『{activeTrick === 'backwater' ? '背水一战' : '金蝉脱壳'}』战役奇谋推演中（专注余息 {trickSecondsLeft} 秒）</p>
+                          <p className="text-stone-700 mt-0.5 leading-snug">主师正处于极限的局部微指挥（Micro-focus）状态，此时战线危急，已暂时切断宏观主线玺令。请等待专注完毕后继续决策！</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {storyTimer !== null && !activeTrick && (
                       <div className="mb-4 bg-[#5c0f11]/5 border border-[#5c0f11]/30 p-2.5 text-xs font-serif text-artistic-charcoal flex justify-between items-center bg-artistic-cream rounded-none animate-pulse">
                         <div className="flex items-center gap-1.5 font-bold">
                           <span className="text-sm">🗣️</span>
@@ -2284,33 +2794,98 @@ export default function App() {
                     </h4>
                     
                     {activeScene.options && activeScene.options.length > 0 ? (
-                      <div className="space-y-3">
-                        {activeScene.options.map((opt, oIdx) => {
-                          const hasReq = opt.requirement !== undefined;
-                          const symbols = ['甲', '乙', '丙', '丁', '戊', '己'];
-                          const symbol = symbols[oIdx] || '癸';
+                      <div>
+                        {(() => {
+                          const OPTIONS_PER_PAGE = 3;
+                          const totalOptions = activeScene.options.length;
+                          const totalPages = Math.ceil(totalOptions / OPTIONS_PER_PAGE);
+                          const startIndex = optionPage * OPTIONS_PER_PAGE;
+                          const paginatedOptions = activeScene.options.slice(startIndex, startIndex + OPTIONS_PER_PAGE);
+
                           return (
-                            <button
-                              key={opt.id}
-                              onClick={() => handleOptionSelect(opt)}
-                              className="w-full text-left bg-artistic-bg border-2 border-artistic-charcoal hover:bg-[#ede0c5]/25 p-4 text-xs md:text-sm tracking-wide font-serif transition-all duration-200 flex items-center relative cursor-pointer"
-                            >
-                              <span className="w-8 h-8 border border-artistic-charcoal flex items-center justify-center mr-4 font-bold shrink-0 text-artistic-charcoal bg-artistic-bg">
-                                {symbol}
-                              </span>
-                              <div className="flex-1 flex justify-between items-center pr-2">
-                                <span className="font-bold text-artistic-ink leading-normal">
-                                  {opt.text}
-                                </span>
-                                {hasReq && (
-                                  <span className="text-[10px] text-artistic-crimson bg-artistic-crimson/10 border border-artistic-crimson/20 rounded px-1.5 py-0.5 shrink-0 font-bold ml-2">
-                                    【判定】
-                                  </span>
-                                )}
+                            <>
+                              <div className="space-y-3">
+                                {paginatedOptions.map((opt, oIdx) => {
+                                  const globalIdx = startIndex + oIdx;
+                                  const hasReq = opt.requirement !== undefined;
+                                  const symbols = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+                                  const symbol = symbols[globalIdx] || '癸';
+                                  
+                                  return (
+                                    <button
+                                      key={opt.id}
+                                      disabled={activeTrick !== null}
+                                      onClick={() => handleOptionSelect(opt)}
+                                      className={`w-full text-left bg-artistic-bg border-2 border-artistic-charcoal hover:bg-[#ede0c5]/25 p-3 text-xs md:text-sm tracking-wide font-serif transition-all duration-200 flex items-center relative rounded-none group ${
+                                        activeTrick !== null
+                                          ? 'opacity-40 cursor-not-allowed select-none'
+                                          : 'cursor-pointer'
+                                      }`}
+                                    >
+                                      <span className="w-8 h-8 border border-artistic-charcoal flex items-center justify-center mr-4 font-bold shrink-0 text-artistic-charcoal bg-artistic-bg group-hover:bg-artistic-crimson group-hover:text-white transition-colors duration-250">
+                                        {symbol}
+                                      </span>
+                                      <div className="flex-1 flex flex-col justify-center">
+                                        <div className="flex justify-between items-center pr-2 mb-1 flex-wrap gap-1">
+                                          <span className="font-bold text-artistic-ink leading-normal text-xs md:text-[13px]">
+                                            {opt.text}
+                                          </span>
+                                          {hasReq && opt.requirement && (
+                                            <span className="text-[9px] text-artistic-crimson bg-artistic-crimson/10 border border-artistic-crimson/20 rounded px-1.5 py-0.5 shrink-0 font-bold ml-1">
+                                              【判定: {
+                                                opt.requirement.attribute === 'force' ? '武勇' :
+                                                opt.requirement.attribute === 'intelligence' ? '智谋' :
+                                                opt.requirement.attribute === 'leadership' ? '指挥' :
+                                                opt.requirement.attribute === 'prestige' ? '声望' :
+                                                opt.requirement.attribute === 'virtue' ? '德行' : '数值'
+                                              } ≥ {opt.requirement.minVal || 0}】
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="text-[10px] text-stone-500 font-serif leading-relaxed flex items-center gap-1">
+                                          {getEvaluationHint(opt)}
+                                        </div>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
                               </div>
-                            </button>
+
+                              {/* Option pagination footer */}
+                              {totalPages > 1 && (
+                                <div className="flex justify-between items-center mt-4 pt-2.5 border-t border-dashed border-artistic-charcoal/20">
+                                  <button
+                                    type="button"
+                                    disabled={optionPage <= 0}
+                                    onClick={() => { sfx.playClick(); setOptionPage(prev => Math.max(0, prev - 1)); }}
+                                    className={`px-3 py-1.5 text-xs font-serif font-bold border border-artistic-charcoal transition-all flex items-center gap-1 ${
+                                      optionPage <= 0
+                                        ? 'text-stone-400 bg-stone-100 border-stone-200 cursor-not-allowed'
+                                        : 'text-[#5c0f11] bg-artistic-cream hover:bg-[#ede0c5]/75 hover:border-artistic-crimson cursor-pointer'
+                                    }`}
+                                  >
+                                    ◀️ 上一页 (Prev Case)
+                                  </button>
+                                  <span className="text-[10.5px] font-sans font-black text-artistic-charcoal bg-artistic-cream/40 px-3 py-1 border border-artistic-charcoal/30">
+                                    对策第 {optionPage + 1} / {totalPages} 页
+                                  </span>
+                                  <button
+                                    type="button"
+                                    disabled={optionPage >= totalPages - 1}
+                                    onClick={() => { sfx.playClick(); setOptionPage(prev => Math.min(totalPages - 1, prev + 1)); }}
+                                    className={`px-3 py-1.5 text-xs font-serif font-bold border border-artistic-charcoal transition-all flex items-center gap-1 ${
+                                      optionPage >= totalPages - 1
+                                        ? 'text-stone-400 bg-stone-100 border-stone-200 cursor-not-allowed'
+                                        : 'text-[#5c0f11] bg-artistic-cream hover:bg-[#ede0c5]/75 hover:border-artistic-crimson cursor-pointer'
+                                    }`}
+                                  >
+                                    下一页 (Next Case) ▶️
+                                  </button>
+                                </div>
+                              )}
+                            </>
                           );
-                        })}
+                        })()}
                       </div>
                     ) : (
                       <div className="text-center py-6 text-xs text-artistic-charcoal opacity-60 italic">
@@ -2364,6 +2939,70 @@ export default function App() {
                             {filterItem.label}
                           </button>
                         ))}
+                      </div>
+
+                      {/* --- 战场特技 栏 (Battlefield Stance Commands) --- */}
+                      <div className="mb-3.5 pb-3 border-b border-dashed border-stone-200">
+                        <div className="flex justify-between items-center mb-1.5">
+                          <span className="text-[10px] uppercase tracking-wider font-bold text-stone-700 bg-amber-100/30 px-1.5 py-0.5 border border-dashed border-amber-300 font-serif">
+                            ⚡ 战场指挥官特技 / Dynamic Tactics
+                          </span>
+                          {activeTrick && (
+                            <span className="text-[9px] text-[#8b0000] bg-[#8b0000]/10 border border-[#8b0000]/20 font-bold px-1.5 py-0.5 animate-pulse font-mono">
+                              执令中: {trickSecondsLeft}秒
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                          <button
+                            type="button"
+                            disabled={activeTrick !== null}
+                            onClick={handleBackwaterTrick}
+                            className={`px-2 py-1.5 text-[11px] border font-serif font-black flex flex-col items-center justify-center transition-all ${
+                              activeTrick === 'backwater'
+                                ? 'bg-artistic-crimson border-artistic-crimson text-white animate-pulse'
+                                : activeTrick !== null
+                                ? 'bg-stone-100 border-stone-250 text-stone-400 cursor-not-allowed opacity-50'
+                                : 'bg-transparent hover:bg-artistic-crimson/10 border-artistic-crimson/30 text-artistic-crimson hover:border-artistic-crimson cursor-pointer shadow-xs'
+                            }`}
+                            title="提升武勇并加注局部战损吸收，但将在6秒内专注防守而锁闭玺令"
+                          >
+                            <span className="font-serif">🌊 背水一战</span>
+                            <span className="text-[8px] font-normal opacity-75 mt-0.5">置之死地 (武勇 +2)</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={activeTrick !== null}
+                            onClick={handleCicadaTrick}
+                            className={`px-2 py-1.5 text-[11px] border font-serif font-black flex flex-col items-center justify-center transition-all ${
+                              activeTrick === 'cicada'
+                                ? 'bg-emerald-700 border-emerald-700 text-white animate-pulse'
+                                : activeTrick !== null
+                                ? 'bg-stone-100 border-stone-250 text-stone-400 cursor-not-allowed opacity-50'
+                                : 'bg-transparent hover:bg-emerald-700/15 border-emerald-800/30 text-emerald-800 hover:border-emerald-700 cursor-pointer shadow-xs'
+                            }`}
+                            title="奇袭诱敌，稳步撤退并召回散兵辎重，但将在6秒内专注潜行而锁闭玺令"
+                          >
+                            <span className="font-serif">🕊️ 金蝉脱壳</span>
+                            <span className="text-[8px] font-normal opacity-75 mt-0.5">分幡疑敌 (兵马 +200)</span>
+                          </button>
+                        </div>
+
+                        {/* Cooldown Progress Bar */}
+                        {activeTrick && (
+                          <div className="bg-stone-200 border border-stone-300 w-full h-[18px] relative overflow-hidden transition-all duration-300">
+                            <div
+                              className={`h-full transition-all duration-100 ease-linear ${
+                                activeTrick === 'backwater' ? 'bg-artistic-crimson/80' : 'bg-emerald-600/80'
+                              }`}
+                              style={{ width: `${trickCooldown}%` }}
+                            ></div>
+                            <span className="absolute inset-0 text-[9px] font-serif font-black text-center flex items-center justify-center text-stone-850 leading-none">
+                              ⏳ 阵法持续剩余 {trickSecondsLeft} 秒 (专注冷却中)
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 scrollbar-ink">
@@ -2477,14 +3116,17 @@ export default function App() {
                             return {
                               name: `${index + 1}幕`,
                               "兵马趋势": runningTroopsChange,
-                              "黄金趋势": runningGoldChange
+                              "黄金趋势": runningGoldChange,
+                              eventMsg: msg,
+                              logType: log.type,
+                              timestamp: log.timestamp
                             };
                           });
 
                           // Ensure we have a default baseline if no logs
                           if (historyPoints.length === 0) {
                             return [
-                              { name: "初始", "兵马趋势": 0, "黄金趋势": 500 }
+                              { name: "初始", "兵马趋势": 1000, "黄金趋势": 500, eventMsg: "三军未动，粮草先行", logType: 'action' as const, timestamp: '建安初年' }
                             ];
                           }
                           return historyPoints;
@@ -2492,22 +3134,48 @@ export default function App() {
 
                         return (
                           <div id="battle-attrition-summary" className="mt-3.5 pt-3.5 border-t border-dashed border-artistic-charcoal/30 text-left text-[10px] font-serif bg-artistic-cream/70 p-2.5 rounded-none shadow-xs">
-                            <div className="font-bold border-b border-artistic-charcoal/20 pb-1 mb-1.5 text-stone-900 flex justify-between tracking-wide">
-                              <span>📊 麾下本章损益与历史趋势 (Chapter Attrition & Trend)</span>
-                              <span className="text-artistic-crimson font-black">时政盘点</span>
+                            <div className="font-bold border-b border-artistic-charcoal/20 pb-1 mb-2 text-stone-900 flex justify-between tracking-wide">
+                              <span>📊 战役志累计统计面板 (Chapter Stats Summary)</span>
+                              <span className="text-artistic-crimson font-black animate-pulse">实时本册</span>
                             </div>
-                            <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 text-stone-700">
-                              <div className="flex justify-between items-center">
-                                <span>💀 战场战损兵马:</span>
-                                <span className="font-mono text-red-700 font-bold">-{troopsLost}</span>
+
+                            {/* Cumulative Stats Grid */}
+                            <div className="grid grid-cols-3 gap-1.5 mb-2.5">
+                              <div className="bg-red-500/5 p-1.5 border border-red-900/10 text-center">
+                                <div className="text-[8.5px] text-[#5c0f11] font-bold font-serif mb-0.5">📉 累计损兵</div>
+                                <span className="font-mono text-xs font-black text-red-700">-{troopsLost}</span>
                               </div>
+                              <div className="bg-amber-500/5 p-1.5 border border-amber-900/10 text-center">
+                                <div className="text-[8.5px] text-amber-950 font-bold font-serif mb-0.5">🪙 耗费黄金</div>
+                                <span className="font-mono text-xs font-black text-amber-800">-{goldSpent}</span>
+                              </div>
+                              <div className="bg-emerald-500/5 p-1.5 border border-emerald-950/10 text-center">
+                                <div className="text-[8.5px] text-emerald-950 font-bold font-serif mb-0.5">⚔️ 歼灭敌寇</div>
+                                <span className="font-mono text-xs font-black text-emerald-700">+{goldGained * 12 + 480}</span>
+                              </div>
+                            </div>
+
+                            {/* Decision cost performance evaluation */}
+                            {(() => {
+                              const enemiesDefeatedVal = goldGained * 12 + 480;
+                              const costRatio = Math.round((enemiesDefeatedVal / (troopsLost || 1)) * 10) / 10;
+                              let ratingText = " 敌顽强缠斗，主公策略需克制变阵，宜进入「修习防卫鹤翼之姿」或「稳守战意偏好」以降低折损比！";
+                              if (costRatio >= 2.5) {
+                                ratingText = " 军略性价比极高！主公如武侯附身，神采飞扬，歼击犀利而损耗极低！";
+                              } else if (costRatio >= 1.5) {
+                                ratingText = " 指挥稳健，攻防互表。大军以稳妥消耗敌军，得失适中。";
+                              }
+                              return (
+                                <div className="bg-amber-100/40 p-2 border border-amber-700/20 text-[9.5px] leading-relaxed text-[#5c0f11] font-serif mb-2.5">
+                                  🚩 <b>【当前决策性价比评估】</b>：极火歼敌与兵损比为 <span className="font-mono font-black text-red-700">{costRatio}x</span>。{ratingText}
+                                </div>
+                              );
+                            })()}
+
+                            <div className="grid grid-cols-2 gap-y-1 gap-x-4 text-stone-700 border-t border-dashed border-stone-200 pt-2 font-serif text-[9.5px]">
                               <div className="flex justify-between items-center">
                                 <span>💂‍♂️ 增纳补给兵士:</span>
                                 <span className="font-mono text-emerald-700 font-bold">+{troopsGained}</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span>💸 军用学资黄金:</span>
-                                <span className="font-mono text-stone-600 font-bold">-{goldSpent}</span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <span>💰 收获税粮岁入:</span>
@@ -2533,9 +3201,36 @@ export default function App() {
                                     <CartesianGrid stroke="#f1e0c6" strokeDasharray="3 3" vertical={false} />
                                     <XAxis dataKey="name" stroke="#78716c" fontSize={8} tickLine={false} />
                                     <YAxis stroke="#78716c" fontSize={8} tickLine={false} />
-                                    <Tooltip 
-                                      contentStyle={{ backgroundColor: '#fcfaf2', border: '1px solid #78716c', fontSize: '9px', padding: '4px' }}
-                                      labelStyle={{ fontWeight: 'bold', color: '#5c0f11' }}
+                                    <Tooltip
+                                      content={({ active, payload, label }) => {
+                                        if (active && payload && payload.length) {
+                                          const data = payload[0].payload;
+                                          const eventDesc = data.eventMsg || "无重大特技或折损交锋";
+                                          return (
+                                            <div className="bg-[#fcfaf2] border-2 border-[#5c0f11] p-2.5 shadow-lg max-w-[220px] rounded-none font-serif text-[10.5px] text-stone-900 border-l-4 border-l-artistic-crimson transition-all duration-150">
+                                              <div className="font-extrabold text-[#5c0f11] border-b border-stone-300 pb-1 mb-1.5 flex justify-between gap-1 items-center">
+                                                <span>📋 {label} (战役交冲)</span>
+                                                <span className="text-[8px] bg-artistic-charcoal text-white px-1 leading-normal scale-90 shrink-0 font-mono">{data.timestamp || '建安中'}</span>
+                                              </div>
+                                              <p className="font-bold text-[#8d1d1f] mb-1 flex justify-between">
+                                                <span>💂‍♂️ 驻营收纳兵马:</span>
+                                                <span className="font-mono text-xs">{data["兵马趋势"]} 人</span>
+                                              </p>
+                                              <p className="font-bold text-amber-805 mb-1 flex justify-between">
+                                                <span>🪙 军屯辎重储备:</span>
+                                                <span className="font-mono text-xs">{data["黄金趋势"]} 金</span>
+                                              </p>
+                                              <div className="border-t border-dashed border-stone-300 mt-1.5 pt-1.5">
+                                                <span className="text-[8.5px] font-black text-stone-600 bg-amber-100/40 px-1 py-0.2 rounded-sm border inline-block mb-1">关键交锋事件志:</span>
+                                                <p className="text-[9.5px] text-stone-750 font-serif leading-relaxed italic bg-[#fcfaf2] p-1.5 border border-stone-250">
+                                                  {eventDesc.length > 55 ? eventDesc.substring(0, 55) + '...' : eventDesc}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          );
+                                        }
+                                        return null;
+                                      }}
                                     />
                                     <Area type="monotone" dataKey="兵马趋势" stroke="#8d1d1f" strokeWidth={1.2} fillOpacity={1} fill="url(#troopsGrad)" name="兵数趋势" />
                                     <Area type="monotone" dataKey="黄金趋势" stroke="#d97706" strokeWidth={1.2} fillOpacity={1} fill="url(#goldGrad)" name="黄金趋势" />
@@ -2666,6 +3361,7 @@ export default function App() {
                 onHarvestTaxes={handleHarvestTaxes}
                 taxCooldown={taxCooldown}
                 onResetTaxCooldown={() => setTaxCooldown(false)}
+                onUpdatePlayerStats={setPlayerStats}
               />
             )}
 
@@ -2675,6 +3371,7 @@ export default function App() {
                 playerStats={playerStats}
                 onRecruitGeneral={handleRecruitGeneral}
                 onTrainGeneral={handleTrainGeneral}
+                onRetireGeneral={handleRetireGeneral}
               />
             )}
 
@@ -2684,6 +3381,8 @@ export default function App() {
                 setPlayerStats={setPlayerStats}
                 activeStance={activeStance}
                 setActiveStance={setActiveStance}
+                battleFormation={battleFormation}
+                onSetBattleFormation={setBattleFormation}
                 onAddBattleLog={(msg, type) => setBattleLogs(prev => [
                   { 
                     id: 'trn_' + Date.now(), 
@@ -2772,6 +3471,119 @@ export default function App() {
               />
             )}
 
+            {gameState === 'ACHIEVEMENTS' && (
+              <div id="achievement-hall-view" className="bg-[#ebd9bc] border-[6px] border-double border-artistic-charcoal rounded-none max-w-4xl mx-auto p-8 shadow-2xl relative text-center animate-fade-in">
+                <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(#3d3228_1.5px,transparent_1.5px)] [background-size:24px_24px]"></div>
+                
+                {/* Header Calligraphy */}
+                <div className="pb-6 mb-6 border-b-2 border-artistic-charcoal/40 relative">
+                  <span className="text-[10px] bg-artistic-crimson text-artistic-bg font-mono font-bold px-3 py-1 uppercase tracking-widest block mx-auto max-w-max mb-3 shadow-[1px_1px_0px_#000]">
+                    🏆 二十四节气 · 岁华功勋 🏆
+                  </span>
+                  <h3 className="font-serif font-black text-3xl text-artistic-crimson flex justify-center items-center gap-2">
+                    <Award className="w-8 h-8 text-artistic-crimson animate-bounce" />
+                    古今功德成就殿堂
+                  </h3>
+                  <p className="text-xs text-stone-700 font-serif mt-2 italic max-w-xl mx-auto leading-relaxed">
+                    夫为将领军、治国御下者，察天时而乘大势也。殿中岁华罗列二十四气之气数玄机，静候主公达成天命异象。
+                  </p>
+                </div>
+
+                {/* Achievement Statistics */}
+                <div className="grid grid-cols-3 gap-4 mb-6 bg-artistic-cream p-4 border border-artistic-charcoal/30 font-serif text-sm">
+                  <div className="text-center">
+                    <div className="text-[10px] text-stone-500 font-bold uppercase">已奉天管辖</div>
+                    <div className="text-2xl font-black text-artistic-crimson font-sans mt-0.5">
+                      {unlockedAchievements.length} <span className="text-xs">/ 12</span>
+                    </div>
+                  </div>
+                  <div className="text-center border-x border-artistic-charcoal/20">
+                    <div className="text-[10px] text-stone-500 font-bold uppercase">大殿气数圆满</div>
+                    <div className="text-2xl font-black text-amber-700 font-sans mt-0.5">
+                      {Math.round((unlockedAchievements.length / 12) * 100)}%
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[10px] text-stone-500 font-bold uppercase">当前时令节气</div>
+                    <div className="text-sm font-black text-emerald-800 mt-1 flex items-center justify-center gap-1">
+                      <span>{SOLAR_TERMS_MAP[playerStats.month]?.icon}</span>
+                      <span>{SOLAR_TERMS_MAP[playerStats.month]?.name.split(' ')[0]}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Achievements Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[460px] overflow-y-auto pr-2 scrollbar-ink mb-6 text-left">
+                  {SOLAR_ACHIEVEMENTS.map((ach) => {
+                    const isUnlocked = unlockedAchievements.includes(ach.id);
+                    return (
+                      <div 
+                        key={ach.id} 
+                        className={`p-4 border-2 flex gap-3 relative overflow-hidden transition-all duration-300 ${
+                          isUnlocked 
+                            ? 'bg-[#fcfaf2] border-amber-600/70 shadow-md transform hover:-translate-y-0.5' 
+                            : 'bg-stone-100/60 border-stone-300 opacity-60'
+                        }`}
+                      >
+                        {/* Status Stamp */}
+                        <div className="absolute top-0 right-0">
+                          {isUnlocked ? (
+                            <span className="text-[8px] bg-amber-500 font-black text-white px-2 py-0.5 uppercase tracking-wider block rounded-bl-sm">
+                              已达成 🌟
+                            </span>
+                          ) : (
+                            <span className="text-[8px] bg-stone-300 font-black text-stone-600 px-2 py-0.5 uppercase tracking-wider block rounded-bl-sm">
+                              未昭雪 🔒
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Term Badge Big */}
+                        <div className={`w-12 h-12 flex flex-col items-center justify-center border font-serif text-center shrink-0 ${
+                          isUnlocked ? 'bg-amber-100 border-amber-400 text-amber-900' : 'bg-stone-200 border-stone-300 text-stone-500'
+                        }`}>
+                          <span className="text-xl leading-none">{ach.termIcon}</span>
+                          <span className="text-[8px] font-bold mt-1 scale-90 leading-none">{ach.termName.split(' ')[0]}</span>
+                        </div>
+
+                        {/* Title and descriptions */}
+                        <div className="flex-1 min-w-0 font-serif">
+                          <h4 className={`text-sm font-black tracking-wide flex items-center gap-1.5 ${
+                            isUnlocked ? 'text-[#5c0f11]' : 'text-stone-500'
+                          }`}>
+                            <span>{ach.title}</span>
+                          </h4>
+                          <p className="text-[10px] text-stone-500 leading-normal mt-1 italic">
+                            “{isUnlocked ? ach.description : '修明内政隐于乾坤，待主公于本气数时节下达成特定伟绩时天命得释。'}”
+                          </p>
+                          <div className="border-t border-dashed border-stone-200 mt-2 pt-1.5 flex justify-between items-center text-[8.5px]">
+                            <span className="font-bold text-stone-600">🎯 释出条件：</span>
+                            <span className={`${isUnlocked ? 'text-amber-800' : 'text-stone-500 bg-stone-200/50 px-1 py-0.5 border border-stone-300/30'}`}>
+                              {ach.conditionDesc}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Back to main menu footer command */}
+                <div className="flex justify-center border-t border-artistic-charcoal/20 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.playClick();
+                      setGameState('MAIN_MENU');
+                    }}
+                    className="bg-artistic-charcoal hover:bg-artistic-crimson text-artistic-bg py-2.5 px-8 border-2 border-transparent hover:border-artistic-bg text-xs tracking-widest font-serif font-black transition-colors rounded-none shadow-md cursor-pointer uppercase flex items-center gap-1.5 animate-pulse"
+                  >
+                    <span>🚪 回到在野大门 (Main Menu)</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {gameState === 'ARCHIVE' && (
               /* Alt Chronicles list */
               <div className="bg-artistic-bg border-4 border-artistic-charcoal rounded-none p-6 shadow-md max-w-4xl mx-auto">
@@ -2785,8 +3597,184 @@ export default function App() {
                   </p>
                 </div>
 
-                {/* Classical Wood-Styled Search Bar */}
+                {/* Sub-tab Switcher: Chronicles vs Historical Calendar */}
+                <div className="flex border-b border-artistic-charcoal/30 mb-5 font-serif text-xs flex-wrap">
+                  <button
+                    onClick={() => { setArchiveSubTab('CHRONICLES'); sfx.playClick(); }}
+                    className={`flex-1 min-w-[120px] py-2 text-center font-bold relative transition-all ${
+                      archiveSubTab === 'CHRONICLES'
+                        ? 'text-artistic-crimson border-b-2 border-artistic-crimson bg-artistic-cream/30 font-black'
+                        : 'text-artistic-charcoal hover:text-artistic-crimson hover:bg-stone-100/35'
+                    }`}
+                  >
+                    📜 已改写的编年简牍
+                  </button>
+                  <button
+                    onClick={() => { setArchiveSubTab('TIMELINE'); sfx.playClick(); }}
+                    className={`flex-1 min-w-[120px] py-2 text-center font-bold relative transition-all ${
+                      archiveSubTab === 'TIMELINE'
+                        ? 'text-artistic-crimson border-b-2 border-artistic-crimson bg-artistic-cream/30 font-black'
+                        : 'text-artistic-charcoal hover:text-artistic-crimson hover:bg-stone-100/35'
+                    }`}
+                  >
+                    🔮 史实与偏离度可视化 (D3)
+                  </button>
+                  <button
+                    onClick={() => { setArchiveSubTab('CALENDAR'); sfx.playClick(); }}
+                    className={`flex-1 min-w-[120px] py-2 text-center font-bold relative transition-all ${
+                      archiveSubTab === 'CALENDAR'
+                        ? 'text-artistic-crimson border-b-2 border-artistic-crimson bg-artistic-cream/30 font-black'
+                        : 'text-artistic-charcoal hover:text-artistic-crimson hover:bg-stone-100/35'
+                    }`}
+                  >
+                    📅 时代演变大事记
+                  </button>
+                </div>
+
                 {(() => {
+                  if (archiveSubTab === 'CALENDAR') {
+                    const currentTotalDays = playerStats.year * 360 + playerStats.month * 30 + playerStats.day;
+                    const HISTORICAL_MILESTONES = [
+                      {
+                        title: "黄巾之乱爆发 (Outbreak of the Yellow Turban Rebellion)",
+                        year: 184,
+                        month: 3,
+                        day: 1,
+                        description: "大贤良师张角纠合天下信徒，口号『苍天已死，黄天当立』，起兵造反，黄巾席卷天下大郡！",
+                        historicalSignificance: "点燃了大汉帝国崩塌的烽火，群雄割据分裂神州。"
+                      },
+                      {
+                        title: "董卓废帝专权 (Dong Zhuo Seizes Power)",
+                        year: 189,
+                        month: 9,
+                        day: 1,
+                        description: "西凉刺史董卓引兵入京，废少帝，立献帝，收吕布，霍乱朝纲，天下郡国合盟征讨讨董！",
+                        historicalSignificance: "汉廷政柄彻底荡然无存，英雄并起吞并天下的格局成形。"
+                      },
+                      {
+                        title: "曹袁官渡会战 (Battle of Guandu)",
+                        year: 200,
+                        month: 2,
+                        day: 1,
+                        description: "曹操与袁绍尽起海内精锐，于关东官渡决战。曹操火烧乌巢，大挫袁军，威震黄河北岸！",
+                        historicalSignificance: "奠定了曹操统一北方、建魏称雄的霸业基石。"
+                      },
+                      {
+                        title: "隆中草庐对 (Three Visits to the Thatch Cottage)",
+                        year: 207,
+                        month: 11,
+                        day: 1,
+                        description: "刘备蛰居新野小城，不辞大雪，三次亲往隆中卧龙岗，求贤若渴躬迎孔明先生出阁掌三军羽扇。",
+                        historicalSignificance: "擘画了鼎足三分之天图，确立了蜀汉跨有荆益之霸道宏图。"
+                      },
+                      {
+                        title: "赤壁鏖兵决胜 (The Battle of Red Cliffs)",
+                        year: 208,
+                        month: 11,
+                        day: 1,
+                        description: "曹操号称百万大军饮马长江。刘备结盟东吴，孔明借东风、周瑜火烧连环铁船，曹操败逃华容道！",
+                        historicalSignificance: "粉碎了曹操鲸吞海内的野望，三国鼎立局势从此铸成。"
+                      },
+                      {
+                        title: "刘备Mian阳称王 (Liu Bei Declares Himself King of Hanzhong)",
+                        year: 219,
+                        month: 7,
+                        day: 1,
+                        description: "汉中鏖兵定军山。大将黄忠力斩夏侯渊。刘备克定汉中天险，登坛受玺受册为汉中王！",
+                        historicalSignificance: "刘备声名声威在汉朝后世达到绝顶。但也埋下关羽失荆州的巅峰前兆麦城悬案。"
+                      },
+                      {
+                        title: "曹丕禅位立魏 (Cao Pi Usurps the Han Throne)",
+                        year: 220,
+                        month: 10,
+                        day: 1,
+                        description: "魏王曹丕废弃大汉天子，逼退汉献帝，自受玺授登基建魏。四百年汉家宗庙帝统至此宣告谢幕。",
+                        historicalSignificance: "东汉皇祚寿终正寝，三国正式纪元降临。"
+                      }
+                    ];
+
+                    return (
+                      <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 scrollbar-ink">
+                        <div className="bg-artistic-cream border border-artistic-charcoal/20 p-3 mb-2 text-xs font-serif text-artistic-charcoal leading-relaxed text-left">
+                          📢 <span className="font-bold text-artistic-crimson">编年大事纪说</span>：神州天地之命轨波折前行，每个重大的历史篇章和节点都将带给天下剧烈的演变。由于您改变天时，您当前的日历是 <span className="font-bold underline text-stone-900 font-mono">公元{playerStats.year}年{playerStats.month}月{playerStats.day}日</span>。关注与各个关键史实大事记的相对间距，感受命运的磅礴呼吸吧！
+                        </div>
+
+                        {HISTORICAL_MILESTONES.map((m, index) => {
+                          const eventTotalDays = m.year * 360 + m.month * 30 + m.day;
+                          const daysRemaining = eventTotalDays - currentTotalDays;
+                          const isUpcoming = daysRemaining > 0;
+
+                          return (
+                            <div 
+                              key={index} 
+                              className={`p-3 border text-left flex flex-col justify-between transition-all duration-300 ${
+                                isUpcoming
+                                  ? 'bg-artistic-cream border-amber-800/40 border-l-4 border-l-emerald-600 shadow-sm'
+                                  : 'bg-stone-200/50 border-stone-300 border-l-4 border-l-stone-550 opacity-80'
+                              }`}
+                            >
+                              <div className="flex justify-between items-start gap-1.5 flex-wrap">
+                                <h4 className={`font-serif font-black text-xs ${isUpcoming ? 'text-stone-900 font-serif' : 'text-stone-500 font-serif line-through'}`}>
+                                  {index + 1}. {m.title}
+                                </h4>
+                                <span className={`text-[9px] font-mono font-bold px-1.5 rounded-none border ${
+                                  isUpcoming
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                    : 'bg-stone-100 text-stone-650 border-stone-300'
+                                }`}>
+                                  目标时日: 公元 {m.year} 年 {m.month} 月
+                                </span>
+                              </div>
+
+                              <p className="text-[11px] text-stone-700 font-serif leading-relaxed mt-1.5 italic">
+                                “ {m.description} ”
+                              </p>
+
+                              <div className="mt-2 pt-2 border-t border-dashed border-stone-300 flex justify-between items-center text-[10px] font-serif">
+                                <span className="text-stone-500 truncate">
+                                  历史影响: {m.historicalSignificance}
+                                </span>
+                                
+                                <span className={`font-mono font-black shrink-0 ml-3 text-[11px] ${
+                                  isUpcoming 
+                                    ? 'text-emerald-700 bg-emerald-50/50 px-1.5 py-0.5 border border-emerald-250 animate-pulse' 
+                                    : 'text-stone-500 bg-stone-100 px-1.5 py-0.5 border border-stone-250'
+                                }`}>
+                                  {isUpcoming 
+                                    ? `⏳ 还剩 ${daysRemaining} 天` 
+                                    : `✅ 史料已过该史实点 (${Math.abs(daysRemaining)} 天前)`
+                                  }
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  }
+
+                  if (archiveSubTab === 'TIMELINE') {
+                    return (
+                      <div className="bg-[#faf5ec] p-6 border-2 border-artistic-charcoal rounded-none shadow-md animate-fade-in relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 opacity-5 pointer-events-none bg-[radial-gradient(#3d3228_1.5px,transparent_1.5px)] [background-size:16px_16px]"></div>
+                        <div className="border-b border-[#5c0f11] pb-3 mb-4 text-left">
+                          <h4 className="font-serif font-black text-lg text-[#5c0f11] flex items-center gap-1.5">
+                            <span>🔮</span> 昭雪天命 · 历史走向分支沙盘
+                          </h4>
+                          <p className="text-[10px] text-stone-600 font-serif leading-relaxed mt-1">
+                            下方为由 D3.js 动态绘制的气数演化时间线。<b>灰色细线轴</b>为正史本色（Orthodox Mainline），<b>红线闪烁分支节点</b>为因主公在逆天抉择中所带来的破局偏离节点（Altered Alternate History），将悬浮触点展开其史实底色与今朝变革！
+                          </p>
+                        </div>
+                        <div className="border-2 border-[#3d3228]/20 bg-[#fbf9f3] p-1 shadow-inner relative flex justify-center overflow-x-auto">
+                          <HistoryTimelineD3 records={historyRecords} />
+                        </div>
+                        <div className="mt-3 text-[10px] text-stone-500 font-serif leading-relaxed italic text-right">
+                          * 偏离历史的选择越多，时间重叠及破局张力越大。青史有知，笔著千秋。
+                        </div>
+                      </div>
+                    );
+                  }
+
                   const query = archiveSearch.toLowerCase();
                   const filtered = historyRecords.filter((rec) => {
                     if (!archiveSearch) return true;
@@ -2806,6 +3794,20 @@ export default function App() {
 
                   return (
                     <>
+                      {/* Simulation Temporal Anomaly Injector Controller */}
+                      <div className="mb-4 bg-[#8b0000]/5 border border-[#8b0000]/30 p-2.5 text-left flex justify-between items-center bg-artistic-cream rounded-none">
+                        <div className="text-[10px] font-serif leading-snug text-stone-800 pr-3.5">
+                          💡 <b>【天意模拟 · 非线性因果对冲】</b>：在真实三国正史中，武圣败走麦城（公元219年）与武侯魂断五丈原（公元234年）相距15载。若在主公逆改天运后的同一纪年中相会触发，将被天书判为因果相冲：
+                        </div>
+                        <button
+                          type="button"
+                          onClick={injectTemporalConflictMocks}
+                          className="px-3 py-1.5 text-[10px] font-serif font-black bg-artistic-crimson text-white hover:bg-artistic-crimson/85 border border-artistic-charcoal shadow-xs whitespace-nowrap cursor-pointer transition-all shrink-0"
+                        >
+                          🔮 触发时空分裂检测模拟
+                        </button>
+                      </div>
+
                       <div className="mb-5 flex gap-2 items-center">
                         <div className="relative flex-1">
                           <input
@@ -2838,50 +3840,92 @@ export default function App() {
                             const originalFact = matchingScene
                               ? matchingScene.historicalFact
                               : (rec.id === 'intro_act'
-                                ? '公元177年，大汉灵帝熹平之年，十常侍专权，民不聊生，黄巾起义暗流涌动。昭烈帝刘备此时仍蛰居于幽州涿县，奉母尽孝，以贩织草鞋、草席为业，潜志待时。'
+                                ? '公元177年，大汉灵帝熹平之年，十常侍专权，民不料民，黄巾起义暗流涌动。昭烈帝刘备此时仍蛰居于幽州涿县，奉母尽孝，以贩织草鞋、草席为业，潜志待时。'
                                 : '大汉史册未尽详录，此演义奇事见证了主公踏入乱世，大展奇谋，逆改命轨之传奇篇章。');
                             const isFactExpanded = !!expandedHistoryFacts[rec.id];
+                            
+                            // Scan for potential non-linear chronological timeline conflicts
+                            const conflict = detectTimeConflict(rec, historyRecords);
 
                             return (
-                              <div key={rec.id} className="bg-artistic-cream p-4 rounded-none border-l-4 border-artistic-crimson border-y border-r border-artistic-charcoal/40 shadow-sm transition-all text-left">
-                                <div className="flex justify-between items-start mb-1 gap-2 flex-wrap">
-                                  <span className="text-xs font-mono font-bold text-artistic-bg bg-artistic-charcoal px-1.5 py-0.5">
-                                    {rec.timestamp}
-                                  </span>
-                                  <div className="flex items-center gap-2">
+                              <div key={rec.id} className="relative group/history-record">
+                                {/* Historical Notes Banner Alert */}
+                                {conflict && (
+                                  <div className="bg-[#8b0000]/5 border-2 border-dashed border-artistic-crimson/60 p-3 mb-2.5 font-serif text-left relative overflow-hidden flex flex-col gap-1.5 animate-fade-in">
+                                    <div className="absolute top-0 right-0 bg-[#8b0000] text-white text-[7.5px] px-2 py-0.5 uppercase tracking-widest font-black [writing-mode:vertical-rl] leading-none select-none opacity-80 h-full flex items-center justify-center">
+                                      时空裂痕
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-artistic-crimson text-[11px] font-sans font-black">
+                                      <span className="text-sm font-sans">📜</span>
+                                      <span>史料注记（非线性重叠警示）</span>
+                                    </div>
+                                    <p className="text-[10px] text-stone-850 leading-relaxed pr-6">
+                                      检测到因果交织重叠！该节点 <b>{rec.title} ({rec.timestamp})</b> 与 <b>{conflict.pairEvent}</b> 在本宇宙同年同分并存发生。原正史因果年份不符，属逆天改命导致的非线性编年裂隙！
+                                    </p>
                                     <button
                                       type="button"
-                                      onClick={() => setExpandedHistoryFacts(prev => ({ ...prev, [rec.id]: !prev[rec.id] }))}
-                                      className="inline-flex items-center gap-1 text-[10px] font-serif font-black text-amber-900 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-600/30 px-2 py-0.5 transition-all cursor-pointer shadow-xs rounded-none"
-                                      title="查看该事件对应的真实历史记载"
+                                      onClick={() => { sfx.playFanfare(true); setSelectedConflictRecord(conflict); }}
+                                      className="bg-[#5c0f11] hover:bg-artistic-crimson text-[#f2e6d0] hover:text-white text-[10px] font-serif font-black py-1 px-3 border border-artistic-charcoal cursor-pointer self-start transition-all duration-150"
                                     >
-                                      <Info className="w-3 h-3 text-amber-700 shrink-0" />
-                                      <span>对比真实史实 ({isFactExpanded ? '收起' : '展开'})</span>
+                                      🔍 展开正史真实年份对比详情
                                     </button>
-                                    <span className={`text-[10px] font-serif font-bold px-2 py-0.5 border ${
-                                      rec.isAltered 
-                                        ? 'bg-artistic-crimson/10 text-artistic-crimson border-artistic-crimson/30' 
-                                        : 'bg-artistic-charcoal/10 text-artistic-charcoal border-artistic-charcoal/30'
-                                    }`}>
-                                      {rec.isAltered ? '【逆天改命】' : '【符合记实】'}
-                                    </span>
-                                  </div>
-                                </div>
-                                <h4 className="font-serif font-black text-artistic-ink text-sm mb-1">{rec.title}</h4>
-                                <p className="text-xs text-artistic-ink/90 font-serif leading-relaxed italic">
-                                  “{rec.brief}”
-                                </p>
-
-                                {/* Historical outcome comparison banner */}
-                                {isFactExpanded && (
-                                  <div className="mt-2.5 bg-[#f5ebd0]/80 border-t border-dashed border-amber-800/30 pt-2 pb-1 px-1 text-xs text-amber-950 font-serif leading-relaxed animate-fade-in">
-                                    <div className="font-black text-amber-900 flex items-center gap-1.5 mb-1 text-[11px]">
-                                      <BookOpen className="w-3.5 h-3.5 text-amber-800 shrink-0" />
-                                      历史原本走向（真实陈述）：
-                                    </div>
-                                    <p className="pl-5 text-stone-800 italic">{originalFact}</p>
                                   </div>
                                 )}
+
+                                <div 
+                                  onClick={() => {
+                                    if (conflict) {
+                                      sfx.playFanfare(true);
+                                      setSelectedConflictRecord(conflict);
+                                    } else {
+                                      setExpandedHistoryFacts(prev => ({ ...prev, [rec.id]: !prev[rec.id] }));
+                                    }
+                                  }}
+                                  className={`bg-artistic-cream p-4 rounded-none border-l-4 ${
+                                    conflict 
+                                      ? 'border-l-[#5c0f11] bg-red-50/20 hover:bg-red-50/40 border-y border-r border-[#5c0f11]/40' 
+                                      : 'border-l-artistic-crimson border-y border-r border-artistic-charcoal/40'
+                                  } shadow-sm transition-all text-left cursor-pointer hover:bg-stone-50/80`}
+                                >
+                                  <div className="flex justify-between items-start mb-1 gap-2 flex-wrap">
+                                    <span className="text-xs font-mono font-bold text-artistic-bg bg-artistic-charcoal px-1.5 py-0.5">
+                                      {rec.timestamp}
+                                    </span>
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                      <button
+                                        type="button"
+                                        onClick={() => setExpandedHistoryFacts(prev => ({ ...prev, [rec.id]: !prev[rec.id] }))}
+                                        className="inline-flex items-center gap-1 text-[10px] font-serif font-black text-amber-900 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-600/30 px-2 py-0.5 transition-all cursor-pointer shadow-xs rounded-none"
+                                        title="查看该事件对应的真实历史记载"
+                                      >
+                                        <Info className="w-3 h-3 text-amber-700 shrink-0" />
+                                        <span>对比真实史实 ({isFactExpanded ? '收起' : '展开'})</span>
+                                      </button>
+                                      <span className={`text-[10px] font-serif font-bold px-2 py-0.5 border ${
+                                        rec.isAltered 
+                                          ? 'bg-artistic-crimson/10 text-artistic-crimson border-artistic-crimson/30' 
+                                          : 'bg-artistic-charcoal/10 text-artistic-charcoal border-artistic-charcoal/30'
+                                      }`}>
+                                        {rec.isAltered ? '【逆天改命】' : '【符合记实】'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <h4 className="font-serif font-black text-artistic-ink text-sm mb-1">{rec.title}</h4>
+                                  <p className="text-xs text-artistic-ink/90 font-serif leading-relaxed italic">
+                                    “{rec.brief}”
+                                  </p>
+
+                                  {/* Historical outcome comparison banner */}
+                                  {isFactExpanded && (
+                                    <div className="mt-2.5 bg-[#f5ebd0]/80 border-t border-dashed border-amber-800/30 pt-2 pb-1 px-1 text-xs text-amber-950 font-serif leading-relaxed animate-fade-in">
+                                      <div className="font-black text-amber-900 flex items-center gap-1.5 mb-1 text-[11px]">
+                                        <BookOpen className="w-3.5 h-3.5 text-amber-800 shrink-0" />
+                                        历史原本走向（真实陈述）：
+                                      </div>
+                                      <p className="pl-5 text-stone-800 italic">{originalFact}</p>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             );
                           })
@@ -3123,12 +4167,19 @@ export default function App() {
                     sfx.playClick();
                     opt.action(playerStats);
                   }}
-                  className="w-full text-left bg-artistic-bg border border-artistic-charcoal hover:bg-[#ede0c5] p-3 text-xs md:text-sm font-serif transition duration-200 flex items-start gap-3 cursor-pointer"
+                  className="w-full text-left bg-artistic-bg border border-artistic-charcoal hover:bg-[#ede0c5] p-3 text-xs md:text-sm font-serif transition duration-200 flex items-start gap-3 cursor-pointer rounded-none"
                 >
-                  <span className="w-6 h-6 border border-artistic-charcoal flex items-center justify-center font-bold text-[10px] shrink-0 bg-artistic-cream">
+                  <span className="w-6 h-6 border border-artistic-charcoal flex items-center justify-center font-bold text-[10px] shrink-0 bg-artistic-cream mt-0.5">
                     {oIdx === 0 ? '壹' : '贰'}
                   </span>
-                  <span className="font-bold text-stone-800 flex-1 leading-snug">{opt.text}</span>
+                  <div className="flex-1 flex flex-col justify-center">
+                    <span className="font-bold text-stone-800 leading-snug text-xs md:text-[13px] mb-1">
+                      {opt.text}
+                    </span>
+                    <div className="text-[10px] text-stone-500 font-serif leading-none">
+                      {getEvaluationHint(opt)}
+                    </div>
+                  </div>
                 </button>
               ))}
             </div>
@@ -3488,6 +4539,97 @@ export default function App() {
                 }}
               >
                 藏之不启
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dynamic historical timeline anomaly comparison modal popup */}
+      {selectedConflictRecord && (
+        <div className="fixed inset-0 bg-artistic-charcoal/85 backdrop-blur-xs flex items-center justify-center p-4 z-[160] animate-fade-in text-left">
+          <div className="bg-[#ede0c5] border-4 border-[#5c0f11] max-w-lg w-full p-6 shadow-2xl relative">
+            <div className="absolute top-0 right-0 bg-[#5c0f11] text-white text-[9px] px-2.5 py-1 font-serif font-black tracking-widest uppercase">
+              因果坍缩警示
+            </div>
+            
+            <button
+               type="button"
+               onClick={() => {
+                 sfx.playClick();
+                 setSelectedConflictRecord(null);
+               }}
+               className="absolute top-4 right-4 text-stone-600 hover:text-artistic-crimson font-bold text-lg cursor-pointer"
+            >
+               ✕
+            </button>
+
+            <div className="border-b-2 border-[#5c0f11] pb-3 mb-4 text-left">
+              <span className="text-[9.5px] bg-artistic-charcoal text-white px-2 py-0.5 font-bold uppercase tracking-wider font-mono">
+                🪐 NON-LINEAR TEMP CONTRAST
+              </span>
+              <h3 className="font-serif font-black text-xl text-artistic-crimson mt-2 leading-tight flex items-center gap-1.5">
+                🔮 史册变轨：正史因果偏逸详情
+              </h3>
+            </div>
+
+            <div className="space-y-4 font-serif text-stone-900 text-xs leading-relaxed max-h-[60vh] overflow-y-auto pr-1">
+              <div className="bg-[#f0dfcc] p-3 border border-amber-800/20 rounded-none">
+                <p className="font-extrabold text-[#5c0f11] border-b border-amber-800/10 pb-1 mb-1.5 text-[11px] uppercase tracking-wider">
+                  🕰️ 当前改命因果谱系
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-center text-[10.5px]">
+                  <div className="bg-red-500/10 p-2 border border-red-900/10">
+                    <div className="font-bold text-artistic-crimson">异常并存纪年</div>
+                    <span className="font-mono font-black text-rose-950 text-xs">大变局 {selectedConflictRecord.currentYear} 年分</span>
+                  </div>
+                  <div className="bg-amber-500/15 p-2 border border-amber-900/15">
+                    <div className="font-bold text-amber-950">关联冲突之谜</div>
+                    <span className="font-sans font-black text-amber-900 text-[10px]">{selectedConflictRecord.pairEvent}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border border-stone-300 bg-white p-3 space-y-2.5 rounded-none shadow-inner">
+                <div className="font-bold text-stone-850 flex items-center gap-1">
+                  <span className="text-sm">🛡️</span>
+                  <span>真实正史原本时空：</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 border-b border-stone-200 pb-2 text-[10.5px]">
+                  <div>
+                    <span className="font-bold text-stone-500">关羽受困麦城正史:</span>
+                    <p className="font-mono text-xs text-artistic-crimson font-bold mt-0.5">公元 219 年</p>
+                  </div>
+                  <div>
+                    <span className="font-bold text-stone-500">诸葛亮五丈原正史:</span>
+                    <p className="font-mono text-xs text-amber-700 font-bold mt-0.5">公元 234 年</p>
+                  </div>
+                </div>
+                <p className="text-[10.5px] text-stone-600 leading-normal italic">
+                  正史昭示，此两大战史惨剧横跨刘备称汉中王与六出祁山多载，绝无共时触发。
+                </p>
+              </div>
+
+              <div className="bg-emerald-500/5 p-3 border border-emerald-900/15 rounded-none">
+                <p className="font-extrabold text-emerald-800 mb-1 leading-snug">
+                  🌌 重叠交错影响（天数改易注记）：
+                </p>
+                <p className="text-[11px] leading-relaxed text-stone-800">
+                  {selectedConflictRecord.conflictReason}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 pt-3 border-t border-artistic-charcoal/40 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  sfx.playClick();
+                  setSelectedConflictRecord(null);
+                }}
+                className="bg-artistic-charcoal hover:bg-artistic-crimson text-[#f2e6d0] font-bold text-xs py-2 px-6 rounded-none transition-colors cursor-pointer"
+              >
+                领悟并抚平裂隙
               </button>
             </div>
           </div>

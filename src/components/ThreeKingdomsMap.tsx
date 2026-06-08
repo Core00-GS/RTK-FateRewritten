@@ -16,6 +16,8 @@ interface MapProps {
   onGarrisonTransfer: (regionId: string, amount: number) => void;
   activeQuests: { targetRegionId: string; title: string }[];
   exploredRegions: string[];
+  annotations?: Record<string, string>;
+  onUpdateAnnotation?: (regionId: string, text: string) => void;
 }
 
 export default function ThreeKingdomsMap({
@@ -25,7 +27,9 @@ export default function ThreeKingdomsMap({
   playerStats,
   onGarrisonTransfer,
   activeQuests,
-  exploredRegions
+  exploredRegions,
+  annotations = {},
+  onUpdateAnnotation
 }: MapProps) {
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(
     regions.find((r) => r.id === playerLocation) || regions[0]
@@ -205,7 +209,7 @@ export default function ThreeKingdomsMap({
               <button
                 key={region.id}
                 onClick={() => handleRegionClick(region)}
-                className={`absolute group transform -translate-x-1/2 -translate-y-1/2 focus:outline-none transition-all duration-300 z-20`}
+                className="absolute group transform -translate-x-1/2 -translate-y-1/2 focus:outline-none transition-all duration-300 z-20"
                 style={{ left: `${region.x}%`, top: `${region.y}%` }}
               >
                 {/* Visual marker ring */}
@@ -244,7 +248,7 @@ export default function ThreeKingdomsMap({
                     </div>
                   )}
 
-                  {/* Regional control indicator / Quest Indicator (only if revealed) */}
+                  {/* Regional control indicator // Quest Indicator (only if revealed) */}
                   {hasQuest && regionRevealed && (
                     <span className="absolute -top-3 -right-3 bg-artistic-crimson text-[9px] text-artistic-bg px-1.5 py-0.5 border border-artistic-charcoal rounded-none font-serif font-bold animate-bounce z-30">
                       战
@@ -263,9 +267,14 @@ export default function ThreeKingdomsMap({
                         💂 {region.garrison.toLocaleString()}
                       </span>
                     )}
+                    {regionRevealed && annotations && annotations[region.id] && (
+                      <span className="text-[7.5px] bg-[#5c0f11]/40 text-red-100 border border-dashed border-red-500/30 px-1 py-[0.5px] mt-0.5 max-w-[80px] overflow-hidden text-ellipsis whitespace-nowrap block">
+                        ✏️ {annotations[region.id]}
+                      </span>
+                    )}
                   </div>
 
-                  {/* Enhanced Hover Tactical Tooltip Card */}
+                  {/* Enhanced Hover Hover Custom Tooltip Card */}
                   <div className="absolute top-11 left-1/2 -translate-x-1/2 bg-[#fcfaf2] text-[#2a2319] text-[9px] p-2 rounded-none border-2 border-artistic-charcoal shadow-2xl transition-all duration-150 z-30 pointer-events-none opacity-0 scale-95 invisible group-hover:opacity-100 group-hover:visible group-hover:scale-100 min-w-[155px] font-serif text-left">
                     <div className="border-b border-[#5c0f11] pb-1 mb-1 flex justify-between items-center gap-2">
                       <strong className="text-xs text-[#5c0f11] font-serif font-black">{region.name}</strong>
@@ -287,6 +296,11 @@ export default function ThreeKingdomsMap({
                           <span>🏗️ 属县开垦:</span>
                           <span className="font-mono font-bold text-amber-850">{region.development}%</span>
                         </div>
+                        {annotations && annotations[region.id] && (
+                          <div className="border-t border-dashed border-stone-300 mt-1 pt-1 text-artistic-crimson text-[8px] font-bold leading-tight">
+                            🎯 手记: {annotations[region.id]}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="text-stone-550 italic leading-snug">
@@ -352,7 +366,7 @@ export default function ThreeKingdomsMap({
                         </div>
                       </div>
                       <div className="bg-[#faf5ec] p-2 border border-stone-300/40 font-serif">
-                        <div className="text-[9px] text-emerald-800 font-bold flex items-center gap-1">
+                        <div className="text-[9px] text-emerald-850 font-bold flex items-center gap-1">
                           <Sparkles className="w-3 h-3 text-emerald-700" />
                           <span>季度赋金增益</span>
                         </div>
@@ -383,6 +397,23 @@ export default function ThreeKingdomsMap({
                       </div>
                     </div>
                   </div>
+
+                  {/* Custom Map Annotation Box */}
+                  {regionRevealed && (
+                    <div className="border-t border-dashed border-stone-300 pt-3 mt-3 font-serif">
+                      <label className="text-[10px] font-bold text-[#5c0f11] flex items-center gap-1 mb-1 leading-none uppercase tracking-wider">
+                        <span>✍️ 备忘御笔批注 (Tactical Annotation)：</span>
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={35}
+                        placeholder="在此手动批写地理民风，如「此处产马」、「战略重兵」..."
+                        value={annotations[selectedRegion.id] || ''}
+                        onChange={(e) => onUpdateAnnotation && onUpdateAnnotation(selectedRegion.id, e.target.value)}
+                        className="w-full bg-[#faf5ec] border border-stone-300 rounded-none px-2 py-1 text-xs text-stone-850 font-serif placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-artistic-crimson"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Column 2: Active Actions */}
@@ -391,7 +422,7 @@ export default function ThreeKingdomsMap({
                     <h5 className="text-[10px] font-bold font-serif text-stone-400 uppercase tracking-wider mb-2">执行政军事令:</h5>
                     {selectedRegion.id === playerLocation ? (
                       <div className="bg-emerald-500/10 border-l-4 border-emerald-600 p-2.5 text-[11px] leading-relaxed flex gap-2">
-                        <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-emerald-800" />
+                        <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-emerald-850" />
                         <span className="text-emerald-950 font-serif">
                           大军目前驻防驻留于 <strong>{selectedRegion.name}</strong> 辖区。主公可于<b>“内政经营”</b>中治水兴修，或探索本地区侧翼奇闻演义。
                         </span>
@@ -449,7 +480,7 @@ export default function ThreeKingdomsMap({
               </div>
 
               {/* Subtitle footer info bar */}
-              <div className="border-t border-dashed border-stone-300 pt-2.5 mt-4 text-[9.5px] text-stone-500 font-serif flex justify-between items-center bg-stone-50/50 px-2 py-1 rounded-none select-none">
+              <div className="border-t border-dashed border-stone-300 pt-2.5 mt-4 text-[9.5px] text-stone-550 font-serif flex justify-between items-center bg-stone-50/50 px-2 py-1 rounded-none select-none">
                 <span>州郡要害地缘交错，握之则安，弃之则危。</span>
                 <span>主公中营义勇行斥：{playerStats.troops.toLocaleString()} 兵卒</span>
               </div>

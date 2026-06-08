@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { PlayerStats, Region } from '../types';
 import { FACTIONS } from '../data/regions';
 import { Coins, UserPlus, Sprout, Landmark, Gift, Heart, Scale, ShieldAlert, Sun, CloudRain, Snowflake, Bug } from 'lucide-react';
@@ -22,6 +22,7 @@ interface TerritoryGovProps {
   taxCooldown: boolean;
   onResetTaxCooldown: () => void;
   activeStance?: 'OFFENSIVE' | 'DEFENSIVE';
+  onUpdatePlayerStats?: React.Dispatch<React.SetStateAction<PlayerStats>>;
 }
 
 export default function TerritoryGov({
@@ -31,7 +32,8 @@ export default function TerritoryGov({
   onHarvestTaxes,
   taxCooldown,
   onResetTaxCooldown,
-  activeStance = 'DEFENSIVE'
+  activeStance = 'DEFENSIVE',
+  onUpdatePlayerStats
 }: TerritoryGovProps) {
   const [selectedRegionId, setSelectedRegionId] = useState<string>(
     regions.find((r) => r.faction === 'PLAYER')?.id || regions[0].id
@@ -197,7 +199,8 @@ export default function TerritoryGov({
   }
 
   // Calculate total taxes player can collect under current crop/weather variation
-  const baseTaxes = playerControlledRegions.reduce((accum, r) => accum + r.revenue, 100); // 100 is base court salary
+  const passiveInc = playerStats.autoDevelopmentPassiveIncome || 0;
+  const baseTaxes = playerControlledRegions.reduce((accum, r) => accum + r.revenue, 100) + passiveInc; // 105 is base court salary and passive increments
   const totalTaxRevenue = Math.round(baseTaxes * harvestMultiplier);
 
   const handleRecruitAction = () => {
@@ -466,6 +469,130 @@ export default function TerritoryGov({
             </button>
           </div>
         </div>
+
+        {/* Automatic Development Investment Panel */}
+        <div id="automatic-development-panel" className={`mt-6 border-t ${seasonThemeBorder} pt-4`}>
+          <h4 className={`font-serif font-black text-sm flex gap-1.5 items-center mb-1 ${seasonTitleColor}`}>
+            <Landmark className="w-4.5 h-4.5 text-emerald-800" />
+            🌾 自动屯垦基建投资 (Automatic Infrastructure Development Engine)
+          </h4>
+          <p className={`text-[11px] mb-3 font-serif ${seasonTextColor}`}>
+            将您的储备黄金本金派驻投入地方商会与农政设施。每当您在剧情中做出决策或进行太守要务使时序轮转，均会常态且永久累积式地增加 <b>常态被动折税总增量</b>，并反哺大笔现钱红利股息，助推长线宏观大业！
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className={`p-3 rounded-none border ${seasonThemeBorder} ${seasonCreamBg} flex flex-col justify-between`}>
+              <div>
+                <div className="text-[10px] uppercase tracking-wide opacity-75 font-mono">当前配置投资本金</div>
+                <div className="text-xl font-sans font-black text-stone-900 mt-1">🪙 {playerStats.autoDevelopmentGold || 0} <span className="text-xs font-serif opacity-75">黄金</span></div>
+              </div>
+              <p className="text-[10px] text-stone-550 mt-2 font-serif italic">
+                安全寄存至各郡县内政商肆，随时可以解调召回！
+              </p>
+            </div>
+
+            <div className={`p-3 rounded-none border ${seasonThemeBorder} ${seasonCreamBg} flex flex-col justify-between`}>
+              <div>
+                <div className="text-[10px] uppercase tracking-wide opacity-75 font-mono">常态岁入永久增幅</div>
+                <div className="text-xl font-sans font-black text-emerald-800 mt-1">🌾 +{playerStats.autoDevelopmentPassiveIncome || 0} <span className="text-xs font-serif opacity-75">黄金/期</span></div>
+              </div>
+              <p className="text-[10px] text-stone-550 mt-2 font-serif italic">
+                基建投产后，历经时节推移时，永久增税自动落地成长！
+              </p>
+            </div>
+
+            <div className={`p-3 rounded-none border border-dashed ${seasonThemeBorder} flex flex-col justify-between`}>
+              <div className="text-stone-850 text-[10px] font-serif leading-relaxed">
+                📢 <span className="font-bold text-artistic-crimson">官营互惠法案</span>：每投 <span className="font-bold">100</span> 两，使累积岁入增加 <span className="font-bold text-emerald-800 font-black">+2</span>，且即时返还 <span className="font-bold text-emerald-800 font-black">+5 现银</span> 商业红利。
+              </div>
+
+              {/* Withdraw Button */}
+              {(playerStats.autoDevelopmentGold || 0) > 0 && (
+                <button
+                  onClick={() => {
+                    if (onUpdatePlayerStats) {
+                      const amount = playerStats.autoDevelopmentGold || 0;
+                      onUpdatePlayerStats(prev => ({
+                        ...prev,
+                        gold: prev.gold + amount,
+                        autoDevelopmentGold: 0
+                      }));
+                      alert(`【基建撤款】主公签发调度玺绶，安全召回派驻各郡县商肆投资基金合计 +${amount} 黄金。`);
+                    }
+                  }}
+                  className="mt-2 text-[10px] text-red-800 underline font-serif font-black text-left hover:text-red-950 cursor-pointer"
+                >
+                  ↩️ 拔款解调，全额撤回资金
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3.5 flex flex-wrap gap-2">
+            <button
+              onClick={() => {
+                const cost = 200;
+                if (playerStats.gold < cost) {
+                  alert("地方富户告急！起投金数需要 200 黄金。");
+                  return;
+                }
+                if (onUpdatePlayerStats) {
+                  onUpdatePlayerStats(prev => ({
+                    ...prev,
+                    gold: prev.gold - cost,
+                    autoDevelopmentGold: (prev.autoDevelopmentGold || 0) + cost
+                  }));
+                  alert(`【产业投资】主公拨发 200 黄金汇解各郡，张罗购买桑麻种子、引渠灌溉。`);
+                }
+              }}
+              className="px-2.5 py-1.5 bg-stone-900 border border-stone-800 hover:bg-stone-800 text-stone-100 text-[10px] font-serif font-bold cursor-pointer transition-all"
+            >
+              🪙 小试牛刀：追加 200 黄金
+            </button>
+
+            <button
+              onClick={() => {
+                const cost = 500;
+                if (playerStats.gold < cost) {
+                  alert("地方富户告急！需要 500 黄金。");
+                  return;
+                }
+                if (onUpdatePlayerStats) {
+                  onUpdatePlayerStats(prev => ({
+                    ...prev,
+                    gold: prev.gold - cost,
+                    autoDevelopmentGold: (prev.autoDevelopmentGold || 0) + cost
+                  }));
+                  alert(`【产业投资】主公下发 500 黄金设立州级大型桑庄，平籴购粮入廪。`);
+                }
+              }}
+              className="px-2.5 py-1.5 bg-emerald-850/90 hover:bg-emerald-900 text-stone-100 border border-emerald-800 text-[10px] font-serif font-bold cursor-pointer transition-all"
+            >
+              🪙 支柱基建：追加 500 黄金
+            </button>
+
+            <button
+              onClick={() => {
+                const cost = 1000;
+                if (playerStats.gold < cost) {
+                  alert("对不起，主公国库空虚，不足 1000 黄金！");
+                  return;
+                }
+                if (onUpdatePlayerStats) {
+                  onUpdatePlayerStats(prev => ({
+                    ...prev,
+                    gold: prev.gold - cost,
+                    autoDevelopmentGold: (prev.autoDevelopmentGold || 0) + cost
+                  }));
+                  alert(`【产业投资】神州巨响！主公签发 1000 黄金特等国债级基建宏图，全线修复运河渡口、设市纳客！`);
+                }
+              }}
+              className="px-2.5 py-1.5 bg-artistic-crimson hover:bg-red-800 text-stone-100 border border-red-900 text-[10px] font-serif font-bold cursor-pointer transition-all"
+            >
+              🪙 巨擘蓝图：追加 1000 黄金
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Taxation ledger panel */}
@@ -510,6 +637,12 @@ export default function TerritoryGov({
                 <span>皇汉奉薪 / 朝廷俸禄</span>
                 <span className="font-sans font-black text-emerald-800 font-extrabold">+100 🌾</span>
               </div>
+              {passiveInc > 0 && (
+                <div className={`flex justify-between text-xs font-serif p-1.5 ${seasonCreamBg} border border-dashed border-emerald-500 rounded-none`}>
+                  <span>🌾 自动屯垦基建收益</span>
+                  <span className="font-sans font-black text-emerald-800 font-extrabold">+{passiveInc} 🌾</span>
+                </div>
+              )}
               {playerControlledRegions.length > 0 ? (
                 playerControlledRegions.map((r) => (
                   <div key={r.id} className={`flex justify-between text-xs font-serif p-1.5 border-b ${seasonThemeBorder} ${seasonTextColor}`}>

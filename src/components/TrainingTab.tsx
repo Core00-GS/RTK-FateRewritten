@@ -13,6 +13,8 @@ interface TrainingTabProps {
   setPlayerStats: React.Dispatch<React.SetStateAction<PlayerStats>>;
   activeStance: 'BALANCED' | 'OFFENSIVE' | 'DEFENSIVE';
   setActiveStance: React.Dispatch<React.SetStateAction<'BALANCED' | 'OFFENSIVE' | 'DEFENSIVE'>>;
+  battleFormation: 'TORTOISE' | 'PHALANX' | 'ARCHER_WALL';
+  onSetBattleFormation: (formation: 'TORTOISE' | 'PHALANX' | 'ARCHER_WALL') => void;
   onAddBattleLog: (msg: string, type: 'action' | 'casualty' | 'gain' | 'random_event') => void;
   showToast: (msg: string) => void;
   playDrum: () => void;
@@ -24,6 +26,8 @@ export default function TrainingTab({
   setPlayerStats,
   activeStance,
   setActiveStance,
+  battleFormation,
+  onSetBattleFormation,
   onAddBattleLog,
   showToast,
   playDrum,
@@ -32,6 +36,11 @@ export default function TrainingTab({
   const [drillLog, setDrillLog] = useState<string[]>([]);
   const [trainingStreak, setTrainingStreak] = useState<number>(0);
   const [focusGoal, setFocusGoal] = useState<'force' | 'intelligence' | 'leadership'>('force');
+
+  // Tactical preference state persisted via LocalStorage
+  const [tacticalPreference, setTacticalPreference] = useState<'ATTACK' | 'DEFEND' | 'AMBUSH'>(() => {
+    return (localStorage.getItem('tk_tactical_preference') as ('ATTACK' | 'DEFEND' | 'AMBUSH')) || 'ATTACK';
+  });
 
   // Sandtable Battle Tactical Simulation Interactive States
   const [simState, setSimState] = useState<'IDLE' | 'SIMULATING' | 'FINISHED'>('IDLE');
@@ -49,7 +58,11 @@ export default function TrainingTab({
     setSimProgress(0);
     setPlayerForceHp(1000);
     setEnemyForceHp(1000);
-    setSimLogs([`🚩 推演启程：天下局势在野。当前阵营大印：【${activeStance === 'OFFENSIVE' ? '锋矢阵·攻势' : activeStance === 'DEFENSIVE' ? '鹤翼阵·守势' : '方圆阵·均衡' }】。两校勇士即刻亮剑接敌！`]);
+    
+    const formationCH = battleFormation === 'TORTOISE' ? '金甲龟宿阵' : battleFormation === 'PHALANX' ? '重锋刺枪方阵' : '强弩拦滞箭墙阵';
+    const stanceCH = activeStance === 'OFFENSIVE' ? '锋矢攻势' : activeStance === 'DEFENSIVE' ? '鹤翼守势' : '方圆均衡';
+    
+    setSimLogs([`🚩 推演启程：当前阵法为【${formationCH}】，叠架战旗大印【${stanceCH}】！两军校场士卒长枪出鞘！`]);
 
     let step = 0;
     const interval = setInterval(() => {
@@ -57,89 +70,195 @@ export default function TrainingTab({
       const progressValue = step * 20; // 5 steps total
       setSimProgress(progressValue);
 
+      let playerDmg = 0;
+      let enemyDmg = 0;
+      let logText = "";
+      let floatTextVal = "";
+      let floatTarget: 'player' | 'enemy' | null = null;
+
       if (step === 1) {
         if (activeStance === 'OFFENSIVE') {
-          setSimLogs(prev => [...prev, "⚔️ 【战役拉开】锋矢强攻！我军突骑长枪贯透敌先锋防区 (-180 敌卒)！"]);
-          setEnemyForceHp(prev => Math.max(0, prev - 180));
-          setHitTarget('enemy');
-          setFloatingText({ text: "💥 -180 敌兵", isPlayer: false });
+          enemyDmg = 180;
+          logText = "⚔️ 【战役拉开】我军全线冲锋突刺！突铁骑长枪贯透敌营先锋防线。";
         } else if (activeStance === 'DEFENSIVE') {
-          setSimLogs(prev => [...prev, "🛡️ 【战役拉开】鹤翼两门齐张！我军巨盾严阵固防，敌矢打击尽数化于盾墙。我属零伤亡！"]);
-          setHitTarget(null);
-          setFloatingText(null);
+          enemyDmg = 0;
+          logText = "🛡️ 【战役拉开】飞羽突防！我军两侧羽翼张开盘查，盾林起立，从容截杀散贼。";
         } else {
-          setSimLogs(prev => [...prev, "⚖️ 【战役拉开】方圆之阵稳当。主力部属缓缓向前，平推攻心，中正接招。"]);
-          setEnemyForceHp(prev => Math.max(0, prev - 80));
-          setPlayerForceHp(prev => Math.max(0, prev - 40));
-          setHitTarget('enemy');
-          setFloatingText({ text: "⚔️ -80 敌卒 / -40 本兵", isPlayer: false });
+          enemyDmg = 80;
+          playerDmg = 40;
+          logText = "⚖️ 【战役拉开】两翼有序拉开。方圆平推，交刃白白刺刺，探其根底。";
+        }
+
+        // Apply Formation modifications to step 1
+        if (battleFormation === 'PHALANX') {
+          enemyDmg = Math.round(enemyDmg * 1.25);
+          logText += ` (🔱 刺枪方阵加成：枪尾前推，敌先锋瞬间被刺杀数卒 [-${enemyDmg} 敌卒]！)`;
+          floatTextVal = `⚡ -${enemyDmg} 敌卒`;
+          floatTarget = 'enemy';
+        } else if (battleFormation === 'TORTOISE') {
+          playerDmg = Math.round(playerDmg * 0.70);
+          logText += playerDmg > 0 
+            ? ` (🛡️ 灵龟金铠减伤：由于锁链扎营，伤害成功被盾墙卸除 30%，损折降至 [-${playerDmg} 我兵]！)`
+            : ` (🛡️ 灵龟金铠减伤：盾墙滴水不漏，我部保持零伤亡！)`;
+          floatTextVal = `🛡️ -${playerDmg} 本兵`;
+          floatTarget = 'player';
+        } else {
+          enemyDmg = Math.round(enemyDmg * 1.15);
+          playerDmg = Math.round(playerDmg * 0.85);
+          logText += ` (🏹 拦滞箭墙：中军两翼长弓乱射掩护前进，杀敌 [-${enemyDmg} 敌 / -${playerDmg} 我]！)`;
+          floatTextVal = `🏹 -${enemyDmg} 敌兵`;
+          floatTarget = 'enemy';
         }
       } else if (step === 2) {
         if (activeStance === 'OFFENSIVE') {
-          setSimLogs(prev => [...prev, "🏹 【突击代价】敌营万张劲弩乱射！因我军锋失追求突刺，防线拉直暴露，折损 -220 精步兵！"]);
-          setPlayerForceHp(prev => Math.max(0, prev - 220));
-          setHitTarget('player');
-          setFloatingText({ text: "🏹 -220 兵卒", isPlayer: true });
+          playerDmg = 220;
+          logText = "🏹 【弩袭反击】敌营强弩阵连扣攒射！我前线精骑因为过急突刺，两翼侧漏。";
         } else if (activeStance === 'DEFENSIVE') {
-          setSimLogs(prev => [...prev, "🛡️ 【固若铠城】敌突袭纵队撞入重铠防线，大盾阻断巨烈冲杀！我军仅受极其细微震伤 (-30 守卒)。"]);
-          setPlayerForceHp(prev => Math.max(0, prev - 30));
-          setHitTarget('player');
-          setFloatingText({ text: "-30 盾化", isPlayer: true });
+          playerDmg = 30;
+          logText = "🛡️ 【坚璧固防】敌重装斧骑横向侧袭我军粮盾，遭到我部甲士正面截撞堵击。";
         } else {
-          setSimLogs(prev => [...prev, "⚔️ 【白刃接战】死力撕扯！短刀肉搏撞击，阵前火花漫溢，两翼交刃死战。"]);
-          setEnemyForceHp(prev => Math.max(0, prev - 110));
-          setPlayerForceHp(prev => Math.max(0, prev - 80));
-          setHitTarget('enemy');
-          setFloatingText({ text: "-110 敌 / -80 我", isPlayer: false });
+          enemyDmg = 110;
+          playerDmg = 80;
+          logText = "⚔️ 【白刃相格】校场飞烟尘！铁刃相撞，将士赤臂砍杀，场面交错混乱。";
+        }
+
+        // Apply Formation modifications to step 2
+        if (battleFormation === 'TORTOISE') {
+          playerDmg = Math.round(playerDmg * 0.70);
+          logText += ` (🛡️ 灵龟坚盾：龟甲坚固无比，大度反顶敌军攒射，仅微损 [-${playerDmg} 我兵]！)`;
+          floatTextVal = `🛡️ -${playerDmg} 盾御`;
+          floatTarget = 'player';
+        } else if (battleFormation === 'PHALANX') {
+          enemyDmg = Math.round(enemyDmg * 1.25);
+          playerDmg = Math.round(playerDmg * 1.10);
+          logText += ` (🔱 刺枪反戳：枪尖朝外挺刺敌前额马肚 [-${enemyDmg} 敌 / -${playerDmg} 我]！)`;
+          floatTextVal = `🔱 -${enemyDmg} 枪杀`;
+          floatTarget = 'enemy';
+        } else {
+          playerDmg = Math.round(playerDmg * 0.85);
+          logText += ` (🏹 飞羽截箭：箭幕在头顶编起飞蓬铁遮，卸免 15% 箭损，折损 [-${playerDmg} 我兵]！)`;
+          floatTextVal = `🏹 -${playerDmg} 箭退`;
+          floatTarget = 'player';
         }
       } else if (step === 3) {
         if (activeStance === 'OFFENSIVE') {
-          setSimLogs(prev => [...prev, "🔥 【破防刺胆】帅纛砍断！我攻坚尖兵长驱直入敌中军，生擒折杀敌裨将 (-380 敌骁卒)！敌营陷入狂恐。"]);
-          setEnemyForceHp(prev => Math.max(0, prev - 380));
-          setHitTarget('enemy');
-          setFloatingText({ text: "💥💥 -380 敌溃败", isPlayer: false });
+          enemyDmg = 380;
+          logText = "🔥 【破防溃敌】帅纛折断！我锐锋重刃将突入敌营中宫盘旋，敌将败死溃围！";
         } else if (activeStance === 'DEFENSIVE') {
-          setSimLogs(prev => [...prev, "🏹 【两翼夹射】长弓齐拉！鹤翼合拢大剪围猎，两侧射死敌方绕袭轻骑 (-260 敌甲)！"]);
-          setEnemyForceHp(prev => Math.max(0, prev - 260));
-          setHitTarget('enemy');
-          setFloatingText({ text: "🏹 -260 夹死", isPlayer: false });
+          enemyDmg = 260;
+          logText = "🏹 【两翼夹击】鹰翅合围！两侧伏兵拉开劲弓巨石，迎面暴击敌退却游骑！";
         } else {
-          setSimLogs(prev => [...prev, "⚔️ 【阵法绞杀】攻守相辅。全营紧凑，借高统帅战术，徐徐压制敌游击马队 (-150 敌精)。"]);
-          setEnemyForceHp(prev => Math.max(0, prev - 150));
-          setPlayerForceHp(prev => Math.max(0, prev - 90));
-          setHitTarget('enemy');
-          setFloatingText({ text: "-150 敌 / -90我", isPlayer: false });
+          enemyDmg = 150;
+          playerDmg = 90;
+          logText = "⚔️ 【大阵镇杀】我营稳步递进。战将挥矛冲阵，中后部大索配合，徐徐碾压。";
+        }
+
+        // Apply Formation modifications to step 3
+        if (battleFormation === 'PHALANX') {
+          enemyDmg = Math.round(enemyDmg * 1.25);
+          logText += ` (🔱 刺枪撕裂：一丈八枪齐齐挺出，斩敌首绩狂飙达 [-${enemyDmg} 敌营]！)`;
+          floatTextVal = `💥 -${enemyDmg} 穿膛`;
+          floatTarget = 'enemy';
+        } else if (battleFormation === 'TORTOISE') {
+          playerDmg = Math.round(playerDmg * 0.75);
+          logText += ` (🛡️ 灵龟重御：灵骨护阵，成功消化敌部绝望扑咬 [-${enemyDmg} 敌 / -${playerDmg} 我]！)`;
+          floatTextVal = `🛡️ -${playerDmg} 甲免`;
+          floatTarget = 'player';
+        } else {
+          enemyDmg = Math.round(enemyDmg * 1.15);
+          playerDmg = Math.round(playerDmg * 0.85);
+          logText += ` (🏹 飞羽重袭：后方万箭再次织墙阻断敌首退路 [-${enemyDmg} 敌 / -${playerDmg} 我]！)`;
+          floatTextVal = `🏹 -${enemyDmg} 箭创`;
+          floatTarget = 'enemy';
         }
       } else if (step === 4) {
         if (activeStance === 'OFFENSIVE') {
-          setSimLogs(prev => [...prev, "⚔️ 【舍命相搏】敌军在绝境下发动绝命互斩！我前军锋矢彻底碎裂，陷于浴血绝杀 (-160 兵员)。"]);
-          setPlayerForceHp(prev => Math.max(0, prev - 160));
-          setHitTarget('player');
-          setFloatingText({ text: "-160 绝命肉搏", isPlayer: true });
+          playerDmg = 160;
+          logText = "⚔️ 【绝处相绞】困兽犹斗！敌死士在残垣下不退突刺，与我精骑展开绝命搏击。";
         } else if (activeStance === 'DEFENSIVE') {
-          setSimLogs(prev => [...prev, "🛡️ 【滴水不漏】坚收待平。鹤翼缩合为满地刺猬刺林。箭簇打地，固防毫发未伤 (-40 伤亡)。"]);
-          setPlayerForceHp(prev => Math.max(0, prev - 40));
-          setHitTarget('player');
-          setFloatingText({ text: "-40 守卒", isPlayer: true });
+          playerDmg = 40;
+          logText = "🛡️ 【鸣金徐退】守备合围。鹤翼阵变阵缩回刺猬壳，安然承受零落碎矢。";
         } else {
-          setSimLogs(prev => [...prev, "⚖️ 【鸣金徐退】方国圆阵左右有序掩护，两连将士平稳合阵，缓缓退还中军营地。"]);
-          setHitTarget(null);
-          setFloatingText(null);
+          logText = "⚖️ 【左右掩护】三军左右方阵掩护，后备交替徐守，退出营盘。";
         }
-      } else if (step === 5) {
+
+        // Apply Formation modifications to step 4
+        if (battleFormation === 'TORTOISE') {
+          playerDmg = Math.round(playerDmg * 0.70);
+          logText += ` (🛡️ 龟息保命：完美阻绝回光返照，折损极小至 [-${playerDmg} 我兵]！)`;
+          floatTextVal = `🛡️ -${playerDmg} 免伤`;
+          floatTarget = 'player';
+        } else if (battleFormation === 'PHALANX') {
+          enemyDmg = 80;
+          logText += ` (🔱 刺枪截杀：枪林阻延冲锋，反穿死逼迫敌死士 [-${enemyDmg} 敌兵]！)`;
+          floatTextVal = `⚡ -${enemyDmg} 矛扎`;
+          floatTarget = 'enemy';
+        } else {
+          playerDmg = Math.round(playerDmg * 0.85);
+          logText += ` (🏹 远幕箭遮：强弩压制火力，免遭大创 [-${playerDmg} 我]！)`;
+          floatTextVal = `🏹 -${playerDmg} 箭遮`;
+          floatTarget = 'player';
+        }
+      }
+
+      // Apply Tactical Intention Preferences (Hidden Strategic Parameter adjustments)
+      if (tacticalPreference === 'ATTACK') {
+        enemyDmg = Math.round(enemyDmg * 1.20);
+        playerDmg = Math.round(playerDmg * 1.10);
+        logText += ` (⚡ 秘法·强攻：我军突击压制，杀伤外扩 20%，但己方阵脚随多空 10%！)`;
+      } else if (tacticalPreference === 'DEFEND') {
+        enemyDmg = Math.round(enemyDmg * 0.85);
+        playerDmg = Math.round(playerDmg * 0.75);
+        logText += ` (🛡️ 秘法·稳守：坚壁固持，主公校营抗折抵消 25%，出锋微降 15%！)`;
+      } else if (tacticalPreference === 'AMBUSH') {
+        if (step === 1) {
+          enemyDmg = Math.round(enemyDmg * 1.40);
+          logText += ` (💥 秘法·夜袭突爆：极速先手，首波伏击给予敌先锋致盲打击，额外狂伤 +40%！)`;
+        } else if (step === 2) {
+          playerDmg = Math.round(playerDmg * 1.25);
+          logText += ` (⚠️ 秘法·夜袭反露：行军潜伏时若陷入敌弩警戒重围，遭遇反掐箭伤增加 25%！)`;
+        } else {
+          enemyDmg = Math.round(enemyDmg * 1.05);
+          playerDmg = Math.round(playerDmg * 0.95);
+          logText += ` (⚔️ 秘法·奇刺：微有穿刺卸守增益。)`;
+        }
+      }
+
+      // Update HP state dynamically
+      if (playerDmg > 0) {
+        setPlayerForceHp(prev => Math.max(0, prev - playerDmg));
+      }
+      if (enemyDmg > 0) {
+        setEnemyForceHp(prev => Math.max(0, prev - enemyDmg));
+      }
+
+      setSimLogs(prev => [...prev, logText]);
+      if (floatTextVal) {
+        setHitTarget(floatTarget);
+        setFloatingText({ text: floatTextVal, isPlayer: floatTarget === 'player' });
+      } else {
+        setHitTarget(null);
+        setFloatingText(null);
+      }
+
+      if (step === 5) {
         clearInterval(interval);
         setSimState('FINISHED');
         setHitTarget(null);
         setFloatingText(null);
 
-        let evalResult = "";
-        if (activeStance === 'OFFENSIVE') {
-          evalResult = "🎉 【推演完结】锋矢一往无前：敌营总伤亡爆红达 -670，但我军突锋折损亦较高达 -380。此阵极契合敌弱我强，雷霆歼灭！";
-        } else if (activeStance === 'DEFENSIVE') {
-          evalResult = "🎉 【推演完结】鹤翼羽遮大安：阻守战成效惊艳，敌死伤 -260，我部盾墙防弹：损折仅 -70！宜用在危局劣势求存保种！";
+        let evalResult = `🎉 【战局推演本纪】 阵形合契评价：以【${formationCH}】之奥义，契合【${stanceCH}】大印：\n`;
+        const prefCH = tacticalPreference === 'ATTACK' ? '【强攻意图】' : tacticalPreference === 'DEFEND' ? '【稳守意图】' : '【偷袭/夜袭意图】';
+        evalResult += `👉 战前配置策略：${prefCH}。此项意志潜藏为战场参数，已秘密修正整体兵损及杀敌比值！\n`;
+        
+        if (battleFormation === 'TORTOISE') {
+          evalResult += `👉 【上行评定·铜壁铁牢】 灵龟战阵坚韧不可碎，大度化免了 30% 敌锋狂劲伤害！我部校场损折降至冰点。极度推荐在抵御强敌包夹时使用！`;
+        } else if (battleFormation === 'PHALANX') {
+          evalResult += `👉 【上行评定·枪林万贯】 刺枪战阵狂烈出击，输出伤害乘数剧增了 25%！以刺戳直断当千，但我军防守两翼存在一定短板。极度推荐在我军处于优势突破对峙、斩关时变阵！`;
         } else {
-          evalResult = "🎉 【推演完结】方圆攻御和润：中正持久，累计破敌 -340，我部损挫 -210。应变周到，不畏伏兵暗袭。";
+          evalResult += `👉 【上行评定·弩羽连成】 强弩箭墙中正大安，提供 15% 伤害增幅及 20% 损折免疫，在战线中央形成了铁遮，在持久拉锯中能立下汗马赫功！`;
         }
+
         setSimLogs(prev => [...prev, evalResult]);
         showToast("📈 【沙盘中演】校场阵法交锋演练大捷！两军本纪已备案！");
       }
@@ -478,6 +597,216 @@ export default function TrainingTab({
               🌾 税赋解钞：各地折损少解 -25%
             </div>
           </button>
+        </div>
+
+        {/* Tactical Intent Preference Selection Widget */}
+        <div className="mt-4 border border-artistic-charcoal/30 bg-[#ebd9bc]/20 p-4 rounded-none text-left">
+          <div className="border-b border-[#3d3228]/15 pb-1.5 mb-3 flex justify-between items-center flex-wrap gap-2">
+            <div>
+              <h4 className="font-serif font-black text-xs text-artistic-crimson flex items-center gap-1.5">
+                🎯 三军阵前战术倾向偏好 (Tactical Intent Preference - Hidden Battle Parameters)
+              </h4>
+              <p className="text-[10px] text-stone-600 font-serif leading-relaxed mt-0.5">
+                设定我军遭遇突战、会战时隐藏的临阵战意。这将<b>永久秘密扭转后续战斗及沙盘的大军损折比重与极火威力</b>。
+              </p>
+            </div>
+            <span className="text-[9px] font-mono font-bold bg-amber-800/10 border border-amber-800/20 text-amber-900 px-1.5 py-0.5 rounded-none font-serif">
+              当前秘密战意: {
+                tacticalPreference === 'ATTACK' ? "⚔️ 强攻极火" : 
+                tacticalPreference === 'DEFEND' ? "🛡️ 稳守防弊" : "⚡ 偷袭合击"
+              }
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* OPTION 1: ATTACK */}
+            <button
+              type="button"
+              onClick={() => {
+                setTacticalPreference('ATTACK');
+                localStorage.setItem('tk_tactical_preference', 'ATTACK');
+                playClick();
+                showToast("⚔️ 战术意图秘密改记为「强攻势」！后续会战及砂盘突战伤害 +20%，但兵折多受 10%。");
+              }}
+              className={`p-2.5 border flex flex-col justify-between text-left cursor-pointer transition-all rounded-none ${
+                tacticalPreference === 'ATTACK'
+                  ? 'border-artistic-crimson bg-[#5c0f11]/5 font-black ring-1 ring-artistic-crimson/30'
+                  : 'border-stone-300 bg-[#fbf9f4] hover:bg-stone-100'
+              }`}
+            >
+              <div>
+                <span className="font-serif font-bold text-xs text-stone-900 flex items-center gap-1">
+                  ⚔️ 强攻意图 (Assault)
+                </span>
+                <p className="text-[9.5px] text-stone-600 font-serif mt-1 leading-relaxed">
+                  三军御敌进攻，以战止战！以狂烈火力刺穿敌线，但大略更容易承担散失。
+                </p>
+              </div>
+              <div className="border-t border-dashed border-stone-250 pt-1.5 mt-1.5 text-[9px] font-semibold text-[#5c0f11] font-serif">
+                🚀 沙盘伤害：<span className="text-red-700 font-extrabold">+20%</span> / 🩸 会战损兵：<span className="text-red-700 font-extrabold">+10%</span>
+              </div>
+            </button>
+
+            {/* OPTION 2: DEFEND */}
+            <button
+              type="button"
+              onClick={() => {
+                setTacticalPreference('DEFEND');
+                localStorage.setItem('tk_tactical_preference', 'DEFEND');
+                playClick();
+                showToast("🛡️ 战术意图秘密改记为「稳守防」！后续会战兵折少计 -15%，沙盘抗免 25%。");
+              }}
+              className={`p-2.5 border flex flex-col justify-between text-left cursor-pointer transition-all rounded-none ${
+                tacticalPreference === 'DEFEND'
+                  ? 'border-emerald-700 bg-emerald-500/5 font-black ring-1 ring-emerald-600/30'
+                  : 'border-stone-300 bg-[#fbf9f4] hover:bg-stone-100'
+              }`}
+            >
+              <div>
+                <span className="font-serif font-bold text-xs text-stone-900 flex items-center gap-1">
+                  🛡️ 稳守意图 (Defense)
+                </span>
+                <p className="text-[9.5px] text-stone-600 font-serif mt-1 leading-relaxed">
+                  车营结锁，后备密防。以稳健抗毁消损敌部，沙场与故事兵损大度降幅！
+                </p>
+              </div>
+              <div className="border-t border-dashed border-stone-250 pt-1.5 mt-1.5 text-[9px] font-semibold text-emerald-800 font-serif">
+                🛡️ 沙盘抗痛：<span className="text-emerald-700 font-extrabold">-25%</span> / 🛡️ 会战稳折：<span className="text-emerald-700 font-extrabold">-15%</span>
+              </div>
+            </button>
+
+            {/* OPTION 3: AMBUSH */}
+            <button
+              type="button"
+              onClick={() => {
+                setTacticalPreference('AMBUSH');
+                localStorage.setItem('tk_tactical_preference', 'AMBUSH');
+                playClick();
+                showToast("⚡ 战术意图秘密改记为「偷袭策」！首波大役潜攻 +40%，微保 5% 脱险率。");
+              }}
+              className={`p-2.5 border flex flex-col justify-between text-left cursor-pointer transition-all rounded-none ${
+                tacticalPreference === 'AMBUSH'
+                  ? 'border-amber-700 bg-amber-500/5 font-black ring-1 ring-amber-600/30'
+                  : 'border-stone-300 bg-[#fbf9f4] hover:bg-stone-100'
+              }`}
+            >
+              <div>
+                <span className="font-serif font-bold text-xs text-stone-900 flex items-center gap-1">
+                  ⚡ 偷袭意图 (Ambush)
+                </span>
+                <p className="text-[9.5px] text-stone-600 font-serif mt-1 leading-relaxed">
+                  不露声迹，穿林攀壁！直取粮草敌巢。首波突袭攻势凌厉，但当心陷入合围。
+                </p>
+              </div>
+              <div className="border-t border-dashed border-stone-250 pt-1.5 mt-1.5 text-[9px] font-semibold text-amber-800 font-serif">
+                💥 突袭首伤：<span className="text-red-700 font-extrabold">+40%</span> / 🛡️ 会战稳折：<span className="text-emerald-700 font-extrabold">-5%</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Horizontal Divider */}
+        <div className="border-t border-dashed border-[#3d3228]/35 my-3"></div>
+
+        {/* Formation Selection Block */}
+        <div>
+          <div className="border-b border-[#3d3228]/25 pb-2 mb-3">
+            <h4 className="font-serif font-black text-sm text-amber-955 flex items-center gap-1.5">
+              👑 三国古法名将阵奥义 (Select Battle Formation - Tactically Alters Troop Survival)
+            </h4>
+            <p className="text-[10.5px] text-stone-600 font-serif leading-relaxed mt-1">
+              配合大印姿势，选择您指挥的三军野战列队。阵奥义会<b>直接调整游戏内所有的兵卒战损折算率</b>，并改变沙盘的火力打击力矩：
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Formation 1: TORTOISE */}
+            <button
+              type="button"
+              onClick={() => {
+                onSetBattleFormation('TORTOISE');
+                playDrum();
+                showToast("🛡️ 阵略奥义已变换为「金甲龟宿阵」！全军索链立盾，战损免除再度提升 25%！");
+              }}
+              className={`p-3 border-2 flex flex-col justify-between text-left cursor-pointer transition-all ${
+                battleFormation === 'TORTOISE'
+                  ? 'border-emerald-700 bg-emerald-500/10 shadow-xs'
+                  : 'border-artistic-charcoal/30 bg-[#fbf9f4] hover:bg-[#eae6db]/30'
+              }`}
+            >
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-serif font-black text-xs text-stone-900">🛡️ 金甲龟宿阵 (Tortoise)</span>
+                  {battleFormation === 'TORTOISE' && <span className="text-[8.5px] bg-emerald-700 text-white px-1.5 py-0.5 font-bold font-serif animate-pulse">当前修习</span>}
+                </div>
+                <p className="text-[10px] text-stone-600 font-serif leading-relaxed mb-1.5">
+                  重盾相结，排兵紧锁，灵龟负甲抗乱！极高抵扣飞羽、落石及突袭伏兵等全战场战损伤害。
+                </p>
+              </div>
+              <div className="border-t border-emerald-200/50 pt-1.5 mt-1.5 text-[9.5px] font-mono font-bold text-emerald-800 font-serif">
+                🛡️ 全面战损免折：<span className="text-emerald-700 font-extrabold">-25%</span><br />
+                🎯 适用场景：敌势排山倒海，保全兵种
+              </div>
+            </button>
+
+            {/* Formation 2: PHALANX */}
+            <button
+              type="button"
+              onClick={() => {
+                onSetBattleFormation('PHALANX');
+                playDrum();
+                showToast("🔱 阵略奥义已变换为「重锋刺枪阵」！枪尖对外，突正面破袭力剧增 25%！");
+              }}
+              className={`p-3 border-2 flex flex-col justify-between text-left cursor-pointer transition-all ${
+                battleFormation === 'PHALANX'
+                  ? 'border-amber-700 bg-amber-500/10 shadow-xs'
+                  : 'border-artistic-charcoal/30 bg-[#fbf9f4] hover:bg-[#eae6db]/30'
+              }`}
+            >
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-serif font-black text-xs text-stone-900">🔱 重锋刺枪阵 (Phalanx)</span>
+                  {battleFormation === 'PHALANX' && <span className="text-[8.5px] bg-amber-700 text-white px-1.5 py-0.5 font-bold font-serif">当前修习</span>}
+                </div>
+                <p className="text-[10px] text-stone-600 font-serif leading-relaxed mb-1.5">
+                  以长枪大阵抵角接刃，锐角突破。枪林如刺，具有最高正向穿刺和战损抗击，但阵翼防御微受限。
+                </p>
+              </div>
+              <div className="border-t border-amber-200/50 pt-1.5 mt-1.5 text-[9.5px] font-mono font-bold text-amber-800 font-serif">
+                💥 先锋突刺伤害：<span className="text-red-700 font-extrabold">+25%</span><br />
+                🔱 战损免折比率：<span className="text-amber-700 font-extrabold">-15%</span>
+              </div>
+            </button>
+
+            {/* Formation 3: ARCHER_WALL */}
+            <button
+              type="button"
+              onClick={() => {
+                onSetBattleFormation('ARCHER_WALL');
+                playDrum();
+                showToast("🏹 阵略奥义已变换为「万弩箭墙阵」！箭密铺帘，远距御敌 15% 伤害及 20% 免伤！");
+              }}
+              className={`p-3 border-2 flex flex-col justify-between text-left cursor-pointer transition-all ${
+                battleFormation === 'ARCHER_WALL'
+                  ? 'border-purple-700 bg-purple-500/10 shadow-xs'
+                  : 'border-artistic-charcoal/30 bg-[#fbf9f4] hover:bg-[#eae6db]/30'
+              }`}
+            >
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-serif font-black text-xs text-stone-900">🏹 万弩箭墙阵 (Archer Wall)</span>
+                  {battleFormation === 'ARCHER_WALL' && <span className="text-[8.5px] bg-purple-700 text-white px-1.5 py-0.5 font-bold font-serif animate-pulse">当前修习</span>}
+                </div>
+                <p className="text-[10px] text-stone-600 font-serif leading-relaxed mb-1.5">
+                  万强弓满上，以极其密集的覆地强弩箭雨滞留、射退、收割来犯敌骑，远控场均衡完美。
+                </p>
+              </div>
+              <div className="border-t border-purple-200/50 pt-1.5 mt-1.5 text-[9.5px] font-mono font-bold text-purple-800 font-serif">
+                🛡️ 箭雨伤害阻击：<span className="text-[10px] text-purple-700 font-extrabold">+15%</span><br />
+                🏹 战损中正免折：<span className="text-emerald-700 font-extrabold">-20%</span>
+              </div>
+            </button>
+          </div>
         </div>
       </div>
 

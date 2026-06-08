@@ -25,6 +25,9 @@ export interface PlayerStats {
   day: number;          // 游戏日子 (1-30)
   difficulty: 'easy' | 'normal' | 'hard'; // 难度
   deviance: number;     // 历史扭转度 (%)
+  autoDevelopmentGold?: number;         // 设定的被动基建投资基金
+  autoDevelopmentPassiveIncome?: number;// 累加常态被动折税总增量
+
 }
 
 // 历史武将信息
@@ -81,6 +84,7 @@ export interface OptionEffect {
 export interface StoryOption {
   id: string;
   text: string;                      // 选项文字
+  evaluationHint?: string;           // 权衡评估提示
   requirement?: {                    // 选择此选项的前置要求
     attribute?: keyof PlayerStats;
     minVal?: number;
