@@ -23,6 +23,8 @@ interface TerritoryGovProps {
   onResetTaxCooldown: () => void;
   activeStance?: 'OFFENSIVE' | 'DEFENSIVE';
   onUpdatePlayerStats?: React.Dispatch<React.SetStateAction<PlayerStats>>;
+  tradeRoutes?: { id: string; from: string; to: string; active: boolean }[];
+  onUpdateTradeRoutes?: (routes: { id: string; from: string; to: string; active: boolean }[]) => void;
 }
 
 export default function TerritoryGov({
@@ -33,13 +35,72 @@ export default function TerritoryGov({
   taxCooldown,
   onResetTaxCooldown,
   activeStance = 'DEFENSIVE',
-  onUpdatePlayerStats
+  onUpdatePlayerStats,
+  tradeRoutes = [],
+  onUpdateTradeRoutes
 }: TerritoryGovProps) {
   const [selectedRegionId, setSelectedRegionId] = useState<string>(
     regions.find((r) => r.faction === 'PLAYER')?.id || regions[0].id
   );
 
   const playerControlledRegions = regions.filter((r) => r.faction === 'PLAYER');
+
+  // Trade Route Setup Local select state trackers
+  const [tradeSourceId, setTradeSourceId] = useState<string>('');
+  const [tradeDestId, setTradeDestId] = useState<string>('');
+
+  const initialSource = tradeSourceId || (playerControlledRegions[0]?.id || '');
+  const initialDest = tradeDestId || (playerControlledRegions[1]?.id || '');
+
+  const handleCreateTradeRoute = () => {
+    if (!onUpdateTradeRoutes) return;
+    if (playerStats.politics < 70) {
+      alert("主公政治资质不足 70 点，暂时无法开展远途通商大策！");
+      return;
+    }
+    const sourceReg = regions.find(r => r.id === initialSource);
+    const destReg = regions.find(r => r.id === initialDest);
+    
+    if (!sourceReg || !destReg || sourceReg.id === destReg.id) {
+      alert("请选择两个不同且已被我军全权控制的城池作为商线两翼！");
+      return;
+    }
+    
+    if (sourceReg.faction !== 'PLAYER' || destReg.faction !== 'PLAYER') {
+      alert("通商两端城池必须皆属于我军控制区域！");
+      return;
+    }
+
+    const alreadyExists = tradeRoutes.some(r => 
+      (r.from === sourceReg.id && r.to === destReg.id) ||
+      (r.from === destReg.id && r.to === sourceReg.id)
+    );
+    if (alreadyExists) {
+      alert("商道早已开凿并常态运转中，无须重复架设协议！");
+      return;
+    }
+
+    const fee = 120;
+    if (playerStats.gold < fee) {
+      alert(`开辟丝路、征纳护路卒需要统配 ${fee} 黄金，您的国库余额不足！`);
+      return;
+    }
+
+    // Deduct gold and add route
+    if (onUpdatePlayerStats) {
+      onUpdatePlayerStats(prev => ({ ...prev, gold: prev.gold - fee }));
+    }
+
+    const newRoute = {
+      id: `route_${Date.now()}`,
+      from: sourceReg.id,
+      to: destReg.id,
+      active: true
+    };
+
+    onUpdateTradeRoutes([...tradeRoutes, newRoute]);
+    alert(`【商榷成功】您拨付 ${fee} 黄金雇请驼队，正式确立【${sourceReg.name} ⇆ ${destReg.name}】的行商路线！通商运转后，每日时序轮转均将带给势力丰厚被动商得。`);
+  };
 
   // Compute geopolitical distribution for the Pie Chart representation
   const factionCounts: Record<string, { name: string; count: number; color: string }> = {};
@@ -592,6 +653,124 @@ export default function TerritoryGov({
               🪙 巨擘蓝图：追加 1000 黄金
             </button>
           </div>
+        </div>
+
+        {/* West Kingdom & Cross-City Trade Routes Panel */}
+        <div id="trade-routes-panel" className={`mt-6 border-t ${seasonThemeBorder} pt-4`}>
+          <h4 className={`font-serif font-black text-sm flex gap-1.5 items-center mb-1 ${seasonTitleColor}`}>
+            <Coins className="w-4.5 h-4.5 text-amber-700 animate-spin-slow" />
+            🐫 西域互市 · 跨城商路契盟 (Cross-City Silk Trade Protocols)
+          </h4>
+          <p className={`text-[11px] mb-3 font-serif ${seasonTextColor}`}>
+            主公开通城与城之间的商道协议，可令辖地互通有无、常态互市产油。<b>开设需求主公政治达到 70 点以上</b>。每日时序轮转，依起止双城「开发度」高低奉纳大笔被动钱粮商税！
+          </p>
+
+          {playerStats.politics < 70 ? (
+            <div className="bg-red-500/5 border border-red-900/10 p-3 text-red-900 text-xs font-serif leading-relaxed">
+              🔒 <b>丝路商纲受阻</b>：主公当前政治修为仅为 <span className="font-sans font-extrabold">{playerStats.politics} / 70</span>。缺少长效经纶政纲，商帮难于险路中确立契券，请先通过<b>【屯田垦荒】</b>等要务修业政治属性！
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Construction Form */}
+              <div className={`p-3 border ${seasonThemeBorder} ${seasonCreamBg} grid grid-cols-1 md:grid-cols-3 gap-3 items-end`}>
+                <div>
+                  <label className="text-[10px] font-mono font-bold block mb-1">起运商邑 (Origin)</label>
+                  <select
+                    value={initialSource}
+                    onChange={(e) => setTradeSourceId(e.target.value)}
+                    className="w-full bg-white border border-stone-300 text-xs px-2 py-1 text-stone-800 font-serif focus:outline-none"
+                  >
+                    {playerControlledRegions.map(r => (
+                      <option key={r.id} value={r.id}>{r.name} (开发 {r.development}%)</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-mono font-bold block mb-1">抵界商邑 (Destination)</label>
+                  <select
+                    value={initialDest}
+                    onChange={(e) => setTradeDestId(e.target.value)}
+                    className="w-full bg-white border border-stone-300 text-xs px-2 py-1 text-stone-800 font-serif focus:outline-none"
+                  >
+                    {playerControlledRegions.map(r => (
+                      <option key={r.id} value={r.id}>{r.name} (开发 {r.development}%)</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <button
+                    onClick={handleCreateTradeRoute}
+                    className="w-full py-1.5 bg-amber-705 hover:bg-amber-800 bg-[#7c2d12] hover:bg-[#9a3412] text-[#fcfaf2] font-black text-xs font-serif transition-colors cursor-pointer border border-[#431407] shadow-sm"
+                  >
+                    🤝 确立商约（耗金 120 两）
+                  </button>
+                </div>
+              </div>
+
+              {/* Existing Routes List */}
+              <div className="space-y-2">
+                <h5 className="text-[10px] uppercase font-mono font-bold text-stone-500">
+                  ⛺ 已开设互市契约路网 (Active Trade Routes)
+                </h5>
+                {tradeRoutes && tradeRoutes.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {tradeRoutes.map(route => {
+                      const fromReg = regions.find(r => r.id === route.from);
+                      const toReg = regions.find(r => r.id === route.to);
+                      if (!fromReg || !toReg) return null;
+                      
+                      const singleIncome = Math.floor((fromReg.development + toReg.development) * 0.15 + 15);
+                      const isBroken = fromReg.faction !== 'PLAYER' || toReg.faction !== 'PLAYER';
+
+                      return (
+                        <div key={route.id} className={`p-2.5 border text-xs font-serif flex flex-col justify-between ${
+                          isBroken ? 'bg-red-50/70 border-red-200 opacity-60 text-stone-400 line-through' : 'bg-white border-stone-250 hover:shadow-xs'
+                        }`}>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-bold flex items-center gap-1">
+                              🐫 {fromReg.name} ⇆ {toReg.name}
+                            </span>
+                            <span className={`text-[9px] px-1 py-0.2 rounded-none font-bold ${
+                              isBroken ? 'bg-stone-300 text-stone-600' : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {isBroken ? '🚨 沦陷废弛' : '🟢 常态行商'}
+                            </span>
+                          </div>
+                          
+                          <div className="text-[10px] text-stone-500 flex justify-between items-center mt-1">
+                            <span>
+                              双城开发: {fromReg.development}% | {toReg.development}%
+                            </span>
+                            <span className="font-bold text-emerald-700 font-sans">
+                              +{singleIncome} 🪙/十日
+                            </span>
+                          </div>
+
+                          <div className="border-t border-stone-100 mt-2 pt-1.5 text-right">
+                            <button
+                              onClick={() => {
+                                if (onUpdateTradeRoutes) {
+                                  onUpdateTradeRoutes(tradeRoutes.filter(r => r.id !== route.id));
+                                  alert(`【废弛商路】大营取消了【${fromReg.name} ⇆ ${toReg.name}】的互市契据，各商契护卫宣告复员。`);
+                                }
+                              }}
+                              className="text-[9px] text-red-700 hover:underline cursor-pointer"
+                            >
+                              ✕ 宣告作废此约
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="py-4 text-center border-2 border-dashed border-stone-200 text-xs text-stone-400 font-serif italic">
+                    暂无活跃商帮。请选择主军所辖城邑行商联接，建立您的互市网络！
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

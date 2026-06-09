@@ -347,7 +347,33 @@ export default function App() {
   const [historyRecords, setHistoryRecords] = useState<HistoryRecord[]>([]);
   const [expandedHistoryFacts, setExpandedHistoryFacts] = useState<Record<string, boolean>>({});
   const [archiveSearch, setArchiveSearch] = useState<string>('');
+  const [archiveFilter, setArchiveFilter] = useState<'ALL' | 'Combat' | 'Diplomacy' | 'Personal' | 'Domestic'>('ALL');
   const [archiveSubTab, setArchiveSubTab] = useState<'CHRONICLES' | 'CALENDAR' | 'TIMELINE'>('CHRONICLES');
+  
+  // Battle Summary Popup State for post-battle analysis
+  const [battleSummary, setBattleSummary] = useState<{
+    show: boolean;
+    title: string;
+    troopsLost: number;
+    enemiesDefeated: number;
+    tacticsUsed: string;
+    result: 'VICTORY' | 'DEFEAT';
+  } | null>(null);
+
+  // Cross-city Trade Routes management state
+  const [tradeRoutes, setTradeRoutes] = useState<{ id: string; from: string; to: string; active: boolean }[]>(() => {
+    try {
+      const saved = localStorage.getItem('tk_trade_routes');
+      return saved ? JSON.parse(saved) : [];
+    } catch (_) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('tk_trade_routes', JSON.stringify(tradeRoutes));
+  }, [tradeRoutes]);
+
   const [activeStance, setActiveStance] = useState<'BALANCED' | 'OFFENSIVE' | 'DEFENSIVE'>('BALANCED');
   const [battleFormation, setBattleFormation] = useState<'TORTOISE' | 'PHALANX' | 'ARCHER_WALL'>('TORTOISE');
   const [taxCooldown, setTaxCooldown] = useState<boolean>(false);
@@ -674,15 +700,17 @@ export default function App() {
       id: 'mock_maicheng_conflict',
       timestamp: '公元184年秋',
       title: '关羽大意麦城受困',
-      brief: '由于历史线极度偏离，本应在公元219年发生的麦城受困，竟然在汉中义勇军起兵不久的公元184年早早重叠激活。吕蒙白衣渡江渡了空，你领大军破阵，突围救下关云长！',
-      isAltered: true
+      brief: '由于历史线极度偏离，本应在公元219年发生的麦城受困，竟然在汉中义勇军起兵不久 of 公元184年早早重叠激活。吕蒙白衣渡江渡了空，你领大军破阵，突围救下关云长！',
+      isAltered: true,
+      category: 'Combat'
     };
     const mockRec2: HistoryRecord = {
       id: 'mock_wuzhang_conflict',
       timestamp: '公元184年秋',
       title: '诸葛亮五丈原续命',
       brief: '本应在公元234年病卒于五丈原荒岗之上的诸葛亮，在同一个公元184年事件中，于你的阵前同时油尽灯枯。你拼着己身根基施展了夺天北斗延寿星仪，武侯自此再延寿十二载！',
-      isAltered: true
+      isAltered: true,
+      category: 'Personal'
     };
     
     setHistoryRecords(prev => {
@@ -758,6 +786,46 @@ export default function App() {
           setBattleLogs(prev => [investLog, ...prev]);
         }, 100);
         showToast(`🌾 被动基建产出：获得 🪙 +${rewardLiquidDividend} 黄金股息！`);
+      }
+
+      // Handle Trade Routes Passive Returns
+      const activeTradeRoutes = tradeRoutes.filter(route => {
+        const fromReg = regions.find(r => r.id === route.from);
+        const toReg = regions.find(r => r.id === route.to);
+        return fromReg && toReg && fromReg.faction === 'PLAYER' && toReg.faction === 'PLAYER';
+      });
+
+      if (activeTradeRoutes.length > 0 && elapsedDays > 0) {
+        const intervals = Math.floor(elapsedDays / 10) || 1;
+        let totalTradeIncome = 0;
+        let tradeLogs: string[] = [];
+
+        activeTradeRoutes.forEach(route => {
+          const fromReg = regions.find(r => r.id === route.from)!;
+          const toReg = regions.find(r => r.id === route.to)!;
+          const routeIncome = Math.floor((fromReg.development + toReg.development) * 0.15 + 15) * intervals;
+          totalTradeIncome += routeIncome;
+          tradeLogs.push(`【${fromReg.name} ⇆ ${toReg.name}】(+${routeIncome} 黄金/十日)`);
+        });
+
+        if (totalTradeIncome > 0) {
+          setPlayerStats(prev => ({
+            ...prev,
+            gold: prev.gold + totalTradeIncome
+          }));
+
+          const dateStr = `第${playerStats.year}年 ${playerStats.month}月 ${playerStats.day}日`;
+          const tradeLogMsg = {
+            id: `trade_route_${Date.now()}_${Math.random()}`,
+            timestamp: dateStr,
+            message: `🐫 【丝绸商路贸易】在过去 ${elapsedDays} 天内，您常态运转的 ${activeTradeRoutes.length} 条通商路线贸易畅行！${tradeLogs.join('，')}，沿途关卡商税及行商红利合共 +${totalTradeIncome} 黄金，已封存入库！`,
+            type: 'gain' as const
+          };
+          setTimeout(() => {
+            setBattleLogs(prev => [tradeLogMsg, ...prev]);
+          }, 110);
+          showToast(`🐫 丝路契盟商税：通商共获得 🪙 +${totalTradeIncome} 黄金！`);
+        }
       }
 
       setQuestsList(prevQuests => {
@@ -1314,7 +1382,8 @@ export default function App() {
       timestamp: '公元177年',
       title: '龙蛇起陆',
       brief: `主公 ${initialStats.name}（字${initialStats.courtesyName}）于涿郡白手起家。初设本心，磨牙利枪，志保一方黎庶安宁。`,
-      isAltered: false
+      isAltered: false,
+      category: 'Personal'
     };
     setHistoryRecords([introRecord]);
   };
@@ -1775,6 +1844,50 @@ export default function App() {
     }
   }, [gameState, currentSceneId, runId, playerStats, recruitedGenerals]);
 
+  const triggerBattleSummary = (title: string, result: 'VICTORY' | 'DEFEAT', troopsLost: number, baseEnemies?: number) => {
+    const isWin = result === 'VICTORY';
+    
+    // Choose dynamic tactical details based on the active state and random variations
+    const positiveTactics = [
+      `我军结【${battleFormation === 'TORTOISE' ? '玄武圆门盾阵' : battleFormation === 'PHALANX' ? '两翼鹤翼阵' : '长蛇极走阵'}】坚筑法度。主力绕出敌后，火烧镔铁战车与粮秣草包，敌军大部遂阵型崩溃溃。`,
+      `参军先手设伏并施展【烟煤火计】，顺大风点燃敌寨。烈炎滔天，敌中军前堵被完全撕裂。`,
+      `三军列战突击，主公【振效仁德】，士兵浴血冲锋。以【中军横阵】直击其中门，敌部侧卫守将瞬间破防败退。`
+    ];
+    
+    const negativeTactics = [
+      `敌营采用长枪【攒射攢阵】，我军冲锋前廊过于纵深暴露。遭受高密礌石落木包抄，主力折合甚重。`,
+      `在山口狭路遭遇寇袭【伏兵攒杀】，我骑兵阵脚仓促难成防势。虽主公亲自突围解护，但后军新卒散退多人。`,
+      `因探马情报失真，中敌军【隔段断粮】之深谷包夹，兵困而疲。虽最后关头破险杀出，精旅减员仍无法挽回。`
+    ];
+    
+    const randomTactic = isWin 
+      ? positiveTactics[Math.floor(Math.random() * positiveTactics.length)] 
+      : negativeTactics[Math.floor(Math.random() * negativeTactics.length)];
+
+    const calculatedEnemies = baseEnemies || (isWin 
+      ? Math.floor(troopsLost * 2.2 + Math.random() * 500 + 350)
+      : Math.floor(troopsLost * 0.45 + Math.random() * 120 + 30));
+
+    setBattleSummary({
+      show: true,
+      title,
+      troopsLost: Math.max(0, troopsLost),
+      enemiesDefeated: Math.max(15, calculatedEnemies),
+      tacticsUsed: randomTactic,
+      result
+    });
+
+    try {
+      if (isWin) {
+        sfx.playFanfare(true);
+      } else {
+        sfx.playFanfare(false);
+      }
+    } catch (e) {
+      console.warn("SFX warning:", e);
+    }
+  };
+
   const handleProceedOutcome = () => {
     if (!lastOutcome) return;
     sfx.playClick();
@@ -1782,22 +1895,55 @@ export default function App() {
     const nextId = lastOutcome.nextSceneId;
     const finalStats = lastOutcome.resultingStats;
 
+    // Check if it represents a battle on the historical timeline
+    const sceneData = GAME_SCENES[currentSceneId];
+    if (sceneData) {
+      const prevStats = lastOutcome.initialStats;
+      const lost = prevStats.troops - finalStats.troops;
+      const logText = (sceneData.title + " " + lastOutcome.narration).toLowerCase();
+      
+      const isBattle = lost > 0 && (logText.includes('战') || logText.includes('兵') || logText.includes('袭') || logText.includes('军') || logText.includes('围') || logText.includes('斩') || logText.includes('平叛') || logText.includes('血') || logText.includes('攻') || logText.includes('突'));
+      if (isBattle) {
+        const isWin = !logText.includes('败') && !logText.includes('溃退') && !logText.includes('全军覆没');
+        triggerBattleSummary(
+          sceneData.title,
+          isWin ? 'VICTORY' : 'DEFEAT',
+          lost
+        );
+      }
+    }
+
     // 1. Commit player statistics changes
     setPlayerStats(finalStats);
 
     // 2. Archive history records if this was isAltered or significant
-    const sceneData = GAME_SCENES[currentSceneId];
     if (sceneData) {
       // Find if we altered history
       const prevStats = lastOutcome.initialStats;
       const altered = finalStats.deviance > prevStats.deviance;
       
+      // Determine category based on keywords
+      const determineCategory = (titleStr: string, briefStr: string): 'Combat' | 'Diplomacy' | 'Personal' | 'Domestic' => {
+        const text = (titleStr + " " + briefStr).toLowerCase();
+        if (text.includes('战') || text.includes('兵') || text.includes('军') || text.includes('袭') || text.includes('突') || text.includes('退') || text.includes('武') || text.includes('胜') || text.includes('败') || text.includes('斩') || text.includes('杀') || text.includes('将') || text.includes('骑') || text.includes('阵')) {
+          return 'Combat';
+        }
+        if (text.includes('盟') || text.includes('和') || text.includes('交') || text.includes('礼') || text.includes('让') || text.includes('派') || text.includes('结') || text.includes('亲') || text.includes('贡') || text.includes('使')) {
+          return 'Diplomacy';
+        }
+        if (text.includes('税') || text.includes('垦') || text.includes('粮') || text.includes('谷') || text.includes('筑') || text.includes('库') || text.includes('治') || text.includes('金') || text.includes('内政') || text.includes('荒') || text.includes('官') || text.includes('商')) {
+          return 'Domestic';
+        }
+        return 'Personal';
+      };
+
       const newRec: HistoryRecord = {
         id: `rec_${Date.now()}`,
         timestamp: `公元${finalStats.year}年${finalStats.month}月`,
         title: sceneData.title,
         brief: lastOutcome.narration,
-        isAltered: altered
+        isAltered: altered,
+        category: determineCategory(sceneData.title, lastOutcome.narration)
       };
       setHistoryRecords(prev => [newRec, ...prev]);
     }
@@ -2067,6 +2213,9 @@ export default function App() {
 
   // --- Complete Quest status rewards ---
   const handleQuestComplete = (questId: string, status: 'COMPLETED' | 'FAILED', rewards?: any, lossTroops?: number) => {
+    const questData = questsList.find(q => q.id === questId) || SIDE_QUESTS_POOL.find(q => q.id === questId);
+    const questTitle = questData ? questData.title : '平寇讨逆会战';
+
     // Add to lists
     if (status === 'COMPLETED') {
       setCompletedQuests(prev => [...prev, questId]);
@@ -2078,17 +2227,21 @@ export default function App() {
       if (rewards.prestige) nextStats.prestige += rewards.prestige;
       if (rewards.deviance) nextStats.deviance = Math.min(100, nextStats.deviance + rewards.deviance);
       if (rewards.intelligence) nextStats.intelligence += rewards.intelligence;
+      
+      const victoryCas = Math.floor(Math.random() * 45 + 15);
+      nextStats.troops = Math.max(100, nextStats.troops - victoryCas);
       setPlayerStats(nextStats);
 
       // Faction capture on success
-      const questData = questsList.find(q => q.id === questId);
       if (questData) {
         setRegions(prev => prev.map(r => r.id === questData.targetRegionId ? { ...r, faction: 'PLAYER' } : r));
       }
+
+      triggerBattleSummary(questTitle, 'VICTORY', victoryCas, Math.floor(Math.random() * 550 + 350));
     } else {
       // Deduct troops casualty on fail
+      let actualLoss = lossTroops || 150;
       if (lossTroops) {
-        let actualLoss = lossTroops;
         if (activeStance === 'DEFENSIVE') {
           const saved = Math.round(lossTroops * 0.30);
           actualLoss = Math.max(0, lossTroops - saved);
@@ -2125,6 +2278,8 @@ export default function App() {
           troops: Math.max(100, prev.troops - actualLoss)
         }));
       }
+
+      triggerBattleSummary(questTitle, 'DEFEAT', actualLoss, Math.floor(Math.random() * 120 + 30));
     }
 
     // Set Quest list node done in local state & static pool to be safe
@@ -2956,9 +3111,9 @@ export default function App() {
                         <div className="grid grid-cols-2 gap-2 mb-2">
                           <button
                             type="button"
-                            disabled={activeTrick !== null}
+                            disabled={activeTrick !== null && activeTrick !== 'backwater'}
                             onClick={handleBackwaterTrick}
-                            className={`px-2 py-1.5 text-[11px] border font-serif font-black flex flex-col items-center justify-center transition-all ${
+                            className={`px-2 py-1.5 text-[11px] border font-serif font-black flex flex-col items-center justify-center transition-all relative overflow-hidden ${
                               activeTrick === 'backwater'
                                 ? 'bg-artistic-crimson border-artistic-crimson text-white animate-pulse'
                                 : activeTrick !== null
@@ -2967,15 +3122,25 @@ export default function App() {
                             }`}
                             title="提升武勇并加注局部战损吸收，但将在6秒内专注防守而锁闭玺令"
                           >
-                            <span className="font-serif">🌊 背水一战</span>
-                            <span className="text-[8px] font-normal opacity-75 mt-0.5">置之死地 (武勇 +2)</span>
+                            {activeTrick === 'backwater' && (
+                              <div 
+                                className="absolute left-0 bottom-0 top-0 bg-red-950/45 transition-all duration-100 ease-linear pointer-events-none" 
+                                style={{ width: `${trickCooldown}%` }}
+                              />
+                            )}
+                            <span className="font-serif relative z-10">
+                              {activeTrick === 'backwater' ? '🌊 背水一战 (施计中)' : '🌊 背水一战'}
+                            </span>
+                            <span className="text-[8px] font-normal opacity-75 mt-0.5 relative z-10">
+                              {activeTrick === 'backwater' ? `⌛ 剩余 ${trickSecondsLeft} 秒` : '置之死地 (武勇 +2)'}
+                            </span>
                           </button>
 
                           <button
                             type="button"
-                            disabled={activeTrick !== null}
+                            disabled={activeTrick !== null && activeTrick !== 'cicada'}
                             onClick={handleCicadaTrick}
-                            className={`px-2 py-1.5 text-[11px] border font-serif font-black flex flex-col items-center justify-center transition-all ${
+                            className={`px-2 py-1.5 text-[11px] border font-serif font-black flex flex-col items-center justify-center transition-all relative overflow-hidden ${
                               activeTrick === 'cicada'
                                 ? 'bg-emerald-700 border-emerald-700 text-white animate-pulse'
                                 : activeTrick !== null
@@ -2984,8 +3149,18 @@ export default function App() {
                             }`}
                             title="奇袭诱敌，稳步撤退并召回散兵辎重，但将在6秒内专注潜行而锁闭玺令"
                           >
-                            <span className="font-serif">🕊️ 金蝉脱壳</span>
-                            <span className="text-[8px] font-normal opacity-75 mt-0.5">分幡疑敌 (兵马 +200)</span>
+                            {activeTrick === 'cicada' && (
+                              <div 
+                                className="absolute left-0 bottom-0 top-0 bg-emerald-900/45 transition-all duration-100 ease-linear pointer-events-none" 
+                                style={{ width: `${trickCooldown}%` }}
+                              />
+                            )}
+                            <span className="font-serif relative z-10">
+                              {activeTrick === 'cicada' ? '🕊️ 金蝉脱壳 (施计中)' : '🕊️ 金蝉脱壳'}
+                            </span>
+                            <span className="text-[8px] font-normal opacity-75 mt-0.5 relative z-10">
+                              {activeTrick === 'cicada' ? `⌛ 剩余 ${trickSecondsLeft} 秒` : '分幡疑敌 (兵马 +200)'}
+                            </span>
                           </button>
                         </div>
 
@@ -3362,6 +3537,8 @@ export default function App() {
                 taxCooldown={taxCooldown}
                 onResetTaxCooldown={() => setTaxCooldown(false)}
                 onUpdatePlayerStats={setPlayerStats}
+                tradeRoutes={tradeRoutes}
+                onUpdateTradeRoutes={setTradeRoutes}
               />
             )}
 
@@ -3777,7 +3954,10 @@ export default function App() {
 
                   const query = archiveSearch.toLowerCase();
                   const filtered = historyRecords.filter((rec) => {
+                    const recCat = rec.category || 'Personal';
+                    if (archiveFilter !== 'ALL' && recCat !== archiveFilter) return false;
                     if (!archiveSearch) return true;
+                    
                     const matchesBattle = query === 'battle' && (rec.title.includes('战') || rec.brief.includes('战') || rec.brief.includes('军') || rec.brief.includes('兵'));
                     const matchesEvent = query === 'event' && (rec.title.includes('事') || rec.brief.includes('事') || rec.brief.includes('盟') || rec.brief.includes('遇'));
                     const matchesDecision = query === 'decision' && (rec.title.includes('策') || rec.brief.includes('策') || rec.brief.includes('政') || rec.brief.includes('决'));
@@ -3791,6 +3971,13 @@ export default function App() {
                       matchesDecision
                     );
                   });
+
+                  const CATEGORY_MAP: Record<string, { label: string; color: string }> = {
+                    Combat: { label: '⚔️ 战事', color: 'bg-red-100 text-red-900 border-red-300' },
+                    Diplomacy: { label: '🤝 外交', color: 'bg-blue-100 text-blue-900 border-blue-300' },
+                    Domestic: { label: '👑 内政', color: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
+                    Personal: { label: '👤 秘闻', color: 'bg-amber-100 text-amber-900 border-amber-300' },
+                  };
 
                   return (
                     <>
@@ -3806,6 +3993,33 @@ export default function App() {
                         >
                           🔮 触发时空分裂检测模拟
                         </button>
+                      </div>
+
+                      {/* Category Filter Buttons */}
+                      <div className="mb-3.5 flex flex-wrap gap-1.5 justify-start items-center text-xs font-serif bg-[#f5efdf] p-2.5 border border-artistic-charcoal/20">
+                        <span className="text-stone-700 font-black mr-1 flex items-center gap-1">
+                          <span>📂</span> 历史大事纪分类：
+                        </span>
+                        {[
+                          { id: 'ALL', label: '全部' },
+                          { id: 'Combat', label: '⚔️ 战事 (Combat)' },
+                          { id: 'Diplomacy', label: '🤝 外交 (Diplomacy)' },
+                          { id: 'Domestic', label: '👑 内政 (Domestic)' },
+                          { id: 'Personal', label: '👤 秘闻 (Personal)' }
+                        ].map((btn) => (
+                          <button
+                            key={btn.id}
+                            type="button"
+                            onClick={() => { sfx.playClick(); setArchiveFilter(btn.id as any); }}
+                            className={`px-3 py-1 border font-bold cursor-pointer transition-all duration-150 text-[10.5px] ${
+                              archiveFilter === btn.id
+                                ? 'bg-artistic-crimson text-[#fdfceb] border-[#5c0f11] shadow-inner font-black'
+                                : 'bg-[#faf9f0] text-stone-800 border-stone-400/60 hover:text-artistic-crimson hover:bg-white'
+                            }`}
+                          >
+                            {btn.label}
+                          </button>
+                        ))}
                       </div>
 
                       <div className="mb-5 flex gap-2 items-center">
@@ -3826,7 +4040,7 @@ export default function App() {
                             </button>
                           )}
                         </div>
-                        {archiveSearch && (
+                        {(archiveSearch || archiveFilter !== 'ALL') && (
                           <span className="text-[10px] font-serif font-bold text-artistic-crimson bg-artistic-crimson/5 border border-artistic-crimson/20 px-2.5 py-2 whitespace-nowrap">
                             找到 {filtered.length} 篇相关记载
                           </span>
@@ -3846,6 +4060,8 @@ export default function App() {
                             
                             // Scan for potential non-linear chronological timeline conflicts
                             const conflict = detectTimeConflict(rec, historyRecords);
+                            const recCat = rec.category || 'Personal';
+                            const catStyle = CATEGORY_MAP[recCat] || CATEGORY_MAP.Personal;
 
                             return (
                               <div key={rec.id} className="relative group/history-record">
@@ -3888,9 +4104,15 @@ export default function App() {
                                   } shadow-sm transition-all text-left cursor-pointer hover:bg-stone-50/80`}
                                 >
                                   <div className="flex justify-between items-start mb-1 gap-2 flex-wrap">
-                                    <span className="text-xs font-mono font-bold text-artistic-bg bg-artistic-charcoal px-1.5 py-0.5">
-                                      {rec.timestamp}
-                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs font-mono font-bold text-artistic-bg bg-artistic-charcoal px-1.5 py-0.5">
+                                        {rec.timestamp}
+                                      </span>
+                                      {/* Category Badge Tag to meet requested spec */}
+                                      <span className={`text-[9px] font-serif font-black px-1.5 py-0.5 border ${catStyle.color}`}>
+                                        {catStyle.label}
+                                      </span>
+                                    </div>
                                     <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                       <button
                                         type="button"
@@ -4851,6 +5073,92 @@ export default function App() {
               className="px-8 py-2.5 bg-artistic-crimson border-2 border-artistic-charcoal text-[#fcfaf2] font-black text-sm tracking-widest hover:bg-[#8d1d1f] transition-colors shadow-md cursor-pointer"
             >
               收起画轴 (Close CG)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 战役决胜汇报大告 (Battle Summary Modal) */}
+      {battleSummary?.show && (
+        <div id="battle-summary-modal" className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-[220] animate-fade-in">
+          <div className="bg-[#ebd9bc] border-[8px] border-double border-[#5c0f11] max-w-lg w-full p-6 shadow-2xl relative text-center font-serif text-artistic-charcoal flex flex-col items-center">
+            {/* Ink Stamp Overlay background */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5 font-black text-9xl select-none pointer-events-none text-artistic-crimson rotate-12">
+              {battleSummary.result === 'VICTORY' ? '大捷' : '惨败'}
+            </div>
+
+            {/* Header with retro line decorations */}
+            <div className="border-b-2 border-[#5c0f11]/40 pb-3 w-full mb-4">
+              <span className="text-[10px] bg-artistic-crimson text-artistic-bg font-mono font-bold px-3 py-1 uppercase tracking-widest block mx-auto max-w-max mb-2 shadow-[1px_1px_0px_#000]">
+                ⚔️ {battleSummary.result === 'VICTORY' ? '战役犒赏 · 三军告捷' : '沙场折马 · 虽败犹荣'} ⚔️
+              </span>
+              <h3 className="font-serif font-black text-2xl tracking-wide text-[#5c0f11]">
+                {battleSummary.title}
+              </h3>
+              <p className="text-[10px] text-stone-600 mt-1 italic">
+                “夫战者，动用干戈以正天时，死生之分，存亡之机也。”
+              </p>
+            </div>
+
+            {/* General Results Stamp */}
+            <div className="my-2.5 flex items-center justify-center gap-2">
+              <span className={`text-4xl font-black px-6 py-2.5 border-4 border-double uppercase tracking-wider ${
+                battleSummary.result === 'VICTORY' 
+                  ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-[2px_2px_0px_#115e59]' 
+                  : 'border-red-800 bg-red-50 text-red-900 shadow-[2px_2px_0px_#7f1d1d]'
+              }`}>
+                {battleSummary.result === 'VICTORY' ? '🏆 战役大捷' : '⚠️ 军力败退'}
+              </span>
+            </div>
+
+            {/* Casualties & Enemies slain details */}
+            <div className="w-full bg-[#fcfaf2]/95 border-2 border-[#3d3228]/40 p-4 font-serif text-left space-y-3.5 shadow-inner">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="border-r border-stone-300 pr-2">
+                  <span className="text-[10px] font-bold text-stone-500 uppercase block">📉 我军战役伤亡 (Casualties)</span>
+                  <p className="text-xl font-black text-red-800 font-sans mt-0.5">
+                    -{battleSummary.troopsLost} <span className="text-xs text-stone-600 font-serif">精卒</span>
+                  </p>
+                  <span className="text-[9px] text-stone-500 block mt-0.5">
+                    包含行军病退、死伤与溃落
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-stone-500 uppercase block">⚔️ 歼灭敌方生力 (Enemies Defeated)</span>
+                  <p className="text-xl font-black text-emerald-800 font-sans mt-0.5">
+                    {battleSummary.enemiesDefeated} <span className="text-xs text-stone-600 font-serif">乱寇</span>
+                  </p>
+                  <span className="text-[9px] text-stone-500 block mt-0.5">
+                    重创敌前阵并收纳溃军兵器
+                  </span>
+                </div>
+              </div>
+
+              {/* Specific Tactics contribution as requested */}
+              <div className="border-t border-dashed border-stone-300 pt-3">
+                <span className="text-[10.5px] font-black text-[#5c0f11] flex items-center gap-1">
+                  <span>🗺️</span> 战要析解与克胜战法 (Tactics Log)：
+                </span>
+                <p className="text-[11px] text-stone-700 leading-relaxed mt-1 italic pl-1">
+                  {battleSummary.tacticsUsed}
+                </p>
+              </div>
+
+              {/* Bonus / XP tip */}
+              <div className="text-[9px] text-amber-900 bg-amber-500/10 border border-amber-600/20 p-2 text-center rounded-none italic">
+                * 胜负乃兵家常事。此次敌我双方浴血三军，兵法演习功绩得存。
+              </div>
+            </div>
+
+            {/* Back action */}
+            <button 
+              onClick={() => {
+                sfx.playClick();
+                setBattleSummary(null);
+              }}
+              className="mt-5 w-full py-2.5 bg-[#5c0f11] hover:bg-artistic-crimson border-2 border-artistic-charcoal text-[#fcfaf2] font-black text-sm tracking-widest transition-colors shadow-md cursor-pointer flex justify-center items-center gap-1.5"
+            >
+              <span>收笔罢课 (确立战报)</span>
             </button>
           </div>
         </div>

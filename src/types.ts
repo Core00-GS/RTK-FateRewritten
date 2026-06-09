@@ -45,6 +45,8 @@ export interface General {
   exp: number;          // 经验值
   skill: string;        // 特有技能/战法名称
   skillDesc: string;    // 战法描述
+  traitName?: string;   // 独门特质 (Trait) 名称 (如：鼓舞军心, 运筹帷幄)
+  traitDesc?: string;   // 特质描述与强化效果
   biography: string;    // 传记
   status: 'GARRISON' | 'GUARD' | 'FREE'; // 状态
   recruitCost: number;  // 招募需要消耗的钱粮/声望
@@ -169,6 +171,7 @@ export interface HistoryRecord {
   title: string;      // 事件名称
   brief: string;      // 怎么改变的历史，写下的志书
   isAltered: boolean; // 是否成功偏离了真实历史 (逆天改命)
+  category?: 'Combat' | 'Diplomacy' | 'Personal' | 'Domestic'; // 记录分类 tag
 }
 
 // 存档结构

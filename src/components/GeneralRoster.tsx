@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { General, PlayerStats } from '../types';
 import { INITIAL_GENERAL_POOL } from '../data/generals';
-import { Swords, Star, Award, ShieldAlert, Heart, Trophy, BookOpen, X } from 'lucide-react';
+import { Swords, Star, Award, ShieldAlert, Heart, Trophy, BookOpen, X, Sparkles } from 'lucide-react';
 import GeneralAttributesChart from './GeneralAttributesChart';
 import GeneralRadarChart from './GeneralRadarChart';
 
@@ -1054,6 +1054,17 @@ export default function GeneralRoster({
                 <p className="text-[11px] text-[#2a2319] leading-relaxed">{displayGeneral.skillDesc}</p>
               </div>
 
+              {/* General Unique Trait */}
+              {displayGeneral.traitName && (
+                <div className="bg-[#f0f4ee] border border-emerald-800/20 p-2.5 rounded-none text-xs leading-normal mb-4">
+                  <div className="font-serif font-black text-emerald-850 mb-0.5 flex items-center gap-1 text-[#225c34]">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
+                    独门特质 (Unique Trait)：{displayGeneral.traitName}
+                  </div>
+                  <p className="text-[11px] text-stone-700 leading-relaxed italic">{displayGeneral.traitDesc}</p>
+                </div>
+              )}
+
               {/* 名将心声语录 */}
               <div id="general-quotes-card" className="mb-4">
                 <div className="text-[10px] uppercase font-mono font-bold text-stone-500 mb-1 flex items-center justify-between">
@@ -1619,7 +1630,7 @@ export default function GeneralRoster({
               </div>
 
               {/* Skills and Combat Comparison Details */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-stone-300 pt-4 mb-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-stone-300 pt-4 mb-3">
                 <div className="bg-red-50/50 p-2 border border-red-200 text-[11px] font-serif leading-normal">
                   <span className="font-extrabold text-artistic-crimson block mb-0.5">⚔️ {gen1.name.split(' ')[0]} · 独门战法 [{gen1.skill}]</span>
                   <p className="text-stone-700">{gen1.skillDesc}</p>
@@ -1628,6 +1639,22 @@ export default function GeneralRoster({
                   <span className="font-extrabold text-blue-800 block mb-0.5">⚔️ {gen2.name.split(' ')[0]} · 独门战法 [{gen2.skill}]</span>
                   <p className="text-stone-700">{gen2.skillDesc}</p>
                 </div>
+              </div>
+
+              {/* Traits Comparison */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                {gen1.traitName ? (
+                  <div className="bg-emerald-50/50 p-2 border border-emerald-200 text-[11px] font-serif leading-normal">
+                    <span className="font-extrabold text-[#225c34] block mb-0.5">✨ {gen1.name.split(' ')[0]} · 独门特质 [{gen1.traitName}]</span>
+                    <p className="text-stone-600 italic">{gen1.traitDesc}</p>
+                  </div>
+                ) : <div />}
+                {gen2.traitName ? (
+                  <div className="bg-emerald-50/50 p-2 border border-emerald-200 text-[11px] font-serif leading-normal">
+                    <span className="font-extrabold text-[#225c34] block mb-0.5">✨ {gen2.name.split(' ')[0]} · 独门特质 [{gen2.traitName}]</span>
+                    <p className="text-stone-600 italic">{gen2.traitDesc}</p>
+                  </div>
+                ) : <div />}
               </div>
 
               {/* Actions panel */}
