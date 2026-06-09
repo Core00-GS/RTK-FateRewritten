@@ -37,6 +37,51 @@ export default function TrainingTab({
   const [trainingStreak, setTrainingStreak] = useState<number>(0);
   const [focusGoal, setFocusGoal] = useState<'force' | 'intelligence' | 'leadership'>('force');
 
+  // Handle global hotkeys for changing battle stances ('1', '2', '3')
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.getAttribute('contenteditable') === 'true'
+      )) {
+        return;
+      }
+
+      if (e.key === '1') {
+        if (activeStance !== 'BALANCED') {
+          setActiveStance('BALANCED');
+          playDrum();
+          const message = `⚡ 【神机阵姿契键 [1]】主公大步前踏，传下金谕：改授锋卫营执掌「方圆阵·均衡势」！三军攻防两备，中军安和。`;
+          onAddBattleLog(message, 'action');
+          showToast("⚔️ 热键快捷令：主阵改受「方圆均衡势」！");
+        }
+      } else if (e.key === '2') {
+        if (activeStance !== 'OFFENSIVE') {
+          setActiveStance('OFFENSIVE');
+          playDrum();
+          const message = `⚡ 【神机阵姿契键 [2]】主公按剑指挥，传下金谕：改授突骑锋卫执掌「锋矢阵·狂刃攻势」！万军向前，锋芒暴涨！`;
+          onAddBattleLog(message, 'action');
+          showToast("🏹 热键快捷令：主阵改受「锋矢攻势」！");
+        }
+      } else if (e.key === '3') {
+        if (activeStance !== 'DEFENSIVE') {
+          setActiveStance('DEFENSIVE');
+          playDrum();
+          const message = `⚡ 【神机阵姿契键 [3]】主公麾旗宣召，传下金谕：改授重铠铁军执掌「鹤翼阵·壁立防震守势」！盾壁巍峨，安详御射。`;
+          onAddBattleLog(message, 'action');
+          showToast("🦅 热键快捷令：主阵改受「鹤翼守势」！");
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeStance, setActiveStance, playDrum, onAddBattleLog, showToast]);
+
   // Tactical preference state persisted via LocalStorage
   const [tacticalPreference, setTacticalPreference] = useState<'ATTACK' | 'DEFEND' | 'AMBUSH'>(() => {
     return (localStorage.getItem('tk_tactical_preference') as ('ATTACK' | 'DEFEND' | 'AMBUSH')) || 'ATTACK';

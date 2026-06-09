@@ -3059,14 +3059,78 @@ export default function App() {
                     battleLogAnim === 'flash' ? 'animate-combat-flash border-emerald-600' : ''
                   }`}>
                     <div>
-                      <div className="border-b border-artistic-charcoal pb-3 mb-3 flex justify-between items-center">
+                      <div className="border-b border-artistic-charcoal pb-3 mb-3 flex justify-between items-center flex-wrap gap-2">
                         <h3 className="font-serif font-bold text-base text-artistic-charcoal flex items-center gap-1.5">
                           <Swords className="w-5 h-5 text-artistic-crimson" />
                           三军战役志 (Battle Log)
                         </h3>
-                        <span className="text-[9px] bg-artistic-crimson text-artistic-bg px-2 py-0.5 font-bold animate-pulse">
-                          实时校阅
-                        </span>
+                        <div className="flex gap-1.5 items-center">
+                          <button
+                            onClick={() => {
+                              const logs = battleLogs.filter(log => log.chapterId === currentChapterId);
+                              if (logs.length === 0) {
+                                alert("当前章节暂无交战战役志记录可以导出！");
+                                return;
+                              }
+                              let text = `========= 三国志演义 · 战役志军册 (章节: ${currentChapterId}) =========\n`;
+                              text += `导出时间: ${new Date().toLocaleString()}\n`;
+                              text += `========================================================\n\n`;
+                              logs.forEach((log, idx) => {
+                                const typeName = log.type === 'casualty' ? '战损' : log.type === 'gain' ? '辎重' : log.type === 'random_event' ? '奇遇' : '军令';
+                                text += `[${idx + 1}] 时间: ${log.timestamp} | 类别: ${typeName}\n`;
+                                text += `    军情: ${log.message}\n`;
+                                text += `--------------------------------------------------------\n`;
+                              });
+
+                              let localTroopsLost = 0;
+                              let localTroopsGained = 0;
+                              let localGoldSpent = 0;
+                              let localGoldGained = 0;
+                              logs.forEach(log => {
+                                const msg = log.message;
+                                const lossTroopMatch = msg.match(/(?:折损|战损|损兵|扣除|兵力减少|伤亡|损兵折将|折损兵马|兵力\s*-\s*|军旅折损\s*-\s*|兵卒\s*-\s*|军卒折损\s*-\s*|减少)\s*[-]?\s*(\d+)/);
+                                if (lossTroopMatch) {
+                                  localTroopsLost += parseInt(lossTroopMatch[1], 10);
+                                }
+                                const gainTroopMatch = msg.match(/(?:募集|征募|吸纳|俘获|新卒|大军增配|募得新卒|招募|招兵|兵马增加|新增|新卒\s*\+\s*|兵卒\s*\+\s*|兵力\s*\+\s*)\s*[\+]?\s*(\d+)/);
+                                if (gainTroopMatch) {
+                                  localTroopsGained += parseInt(gainTroopMatch[1], 10);
+                                }
+                                const lossGoldMatch = msg.match(/(?:消耗|扣除|花费|支付|流失|黄金\s*-\s*|扣除黄金|黄金跌落\s*-\s*|放粥\s*-\s*|损失\s*-\s*|损失)\s*[-]?\s*(\d+)/);
+                                if (lossGoldMatch) {
+                                  localGoldSpent += parseInt(lossGoldMatch[1], 10);
+                                }
+                                const gainGoldMatch = msg.match(/(?:博得|岁入|黄金增加|获得|俸禄\s*\+\s*|征得|赋税\s*\+\s*|税款\s*\+\s*|黄金\s*\+\s*|征收|秋收|缴得|黄金\s*.*\+\s*)\s*[\+]?\s*(\d+)/);
+                                if (gainGoldMatch) {
+                                  localGoldGained += parseInt(gainGoldMatch[1], 10);
+                                }
+                              });
+                              text += `\n统计汇报: \n`;
+                              text += ` - 累计总义勇战损: ${localTroopsLost} 军卒\n`;
+                              text += ` - 累计新征募义勇: ${localTroopsGained} 军卒\n`;
+                              text += ` - 累计支出行军黄金军饷: ${localGoldSpent} 🪙\n`;
+                              text += ` - 累计内政及互市博得黄金: ${localGoldGained} 🪙\n`;
+                              text += `======================= 册尾 =======================\n`;
+
+                              const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = `battle_logs_${currentChapterId}_${Date.now()}.txt`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                              URL.revokeObjectURL(url);
+                              showToast("💾 战役志军册成功导出下载！");
+                            }}
+                            className="text-[9px] bg-emerald-700 hover:bg-emerald-800 text-white border border-emerald-800 px-1.5 py-0.5 font-bold font-serif cursor-pointer flex items-center gap-1 active:scale-95 transition-all rounded-none"
+                          >
+                            <span>💾 导出战志</span>
+                          </button>
+                          <span className="text-[9px] bg-artistic-crimson text-artistic-bg px-2 py-0.5 font-bold animate-pulse">
+                            实时校阅
+                          </span>
+                        </div>
                       </div>
                       
                       <p className="text-[10px] text-artistic-charcoal opacity-80 font-serif mb-2 leading-tight">
@@ -3525,6 +3589,7 @@ export default function App() {
                 onGarrisonTransfer={handleGarrisonTransfer}
                 activeQuests={questsList.filter((q) => q.status === 'AVAILABLE' || q.status === 'ACTIVE').map(q => ({ targetRegionId: q.targetRegionId, title: q.title }))}
                 exploredRegions={exploredRegions}
+                tradeRoutes={tradeRoutes}
               />
             )}
 
@@ -4239,6 +4304,23 @@ export default function App() {
                   >
                     👑 重新参悟天理 · 重置大业重开一世
                   </button>
+
+                  <button
+                    onClick={() => {
+                      setConfirmBox({
+                        message: "确定要以当前角色属性、累积英华和麾下良将开启【多周目回溯】，重新回到序章（第一章·世外高人卦演天记）吗？",
+                        onConfirm: () => {
+                          setCurrentSceneId('c1_0');
+                          setCurrentChapterId('c1');
+                          setGameState('STORY');
+                          showToast("⏳ 多周目时空回溯完毕！英杰随主，命运天命再度开启！");
+                        }
+                      });
+                    }}
+                    className="w-full bg-artistic-cream hover:bg-artistic-charcoal hover:text-artistic-bg text-artistic-charcoal py-3 px-6 rounded-none font-serif font-black text-xs shadow-md transition-all cursor-pointer border-2 border-artistic-charcoal block mt-3"
+                  >
+                    ⏳ 多周目回溯 · 保留智将重回序章
+                  </button>
                 </div>
               </div>
             )}
@@ -4294,6 +4376,23 @@ export default function App() {
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 焚毁大业
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmBox({
+                    message: "确定要施展【时空回溯】重新回到序章（第一章·世外高人卦演天记）吗？您当前的宿命点、家臣良将等数据将会保留，仅主线剧情进度重置回序章起点。",
+                    onConfirm: () => {
+                      setCurrentSceneId('c1_0');
+                      setCurrentChapterId('c1');
+                      setGameState('STORY');
+                      showToast("⏳ 乾坤扭转！您已越过虚空，重新回到第一章序章世外桃源批命之时！");
+                    }
+                  });
+                }}
+                className="bg-[#e6f4ea] hover:bg-[#d2e3fc] text-[#137333] rounded-none border border-[#137333]/40 px-3 py-1 text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                回到序章
               </button>
             </div>
           </div>

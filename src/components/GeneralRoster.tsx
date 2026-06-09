@@ -808,11 +808,30 @@ export default function GeneralRoster({
                         <div className="w-8 h-8 rounded-none bg-artistic-crimson/15 text-artistic-crimson border-2 border-artistic-crimson flex items-center justify-center font-bold font-serif text-sm shadow-sm shrink-0">
                           {g.avatar}
                         </div>
-                        <div className="truncate">
-                          <div className="font-serif font-black text-artistic-charcoal text-xs truncate">{g.name}</div>
-                          <div className="text-[9px] text-artistic-charcoal/70 font-serif">等阶: 偏将 LV.{g.level}</div>
+                        <div className="truncate w-full">
+                          <div className="font-serif font-black text-artistic-charcoal text-xs truncate flex items-center justify-between gap-1">
+                            <span className="truncate">{g.name.split(' ')[0]}</span>
+                            <span className="shrink-0 text-[8px] bg-amber-100 border border-amber-400 text-amber-900 px-1 font-bold rounded-none scale-90">LV.{g.level}</span>
+                          </div>
+                          <div className="text-[9px] text-artistic-charcoal/75 font-serif flex items-center justify-between gap-1 mt-0.5">
+                            <span className="truncate text-[8.5px] opacity-75">等阶: 偏将</span>
+                            {(() => {
+                              if (g.force >= 90) return <span className="shrink-0 text-[8px] px-1 py-0.2 bg-[#5c0f11] text-red-100 font-serif font-bold shadow-xs">🔥 骁勇神将</span>;
+                              if (g.intelligence >= 90) return <span className="shrink-0 text-[8px] px-1 py-0.2 bg-emerald-800 text-emerald-100 font-serif font-bold shadow-xs">🌌 智伐神谋</span>;
+                              if (g.virtue >= 90) return <span className="shrink-0 text-[8px] px-1 py-0.2 bg-amber-700 text-amber-50 font-serif font-bold shadow-xs">✨ 德劭名门</span>;
+                              return <span className="shrink-0 text-[8px] px-1 py-0.2 bg-stone-500 text-neutral-100 font-serif font-bold">良材良木</span>;
+                            })()}
+                          </div>
                         </div>
                       </div>
+
+                      {g.traitName && (
+                        <div className="mt-1 pb-1 mb-1 border-b border-dashed border-stone-200/65 text-[8.5px] leading-tight font-serif">
+                          <span className="text-[#225c34] font-extrabold">✨ {g.traitName.split(' ')[0]}</span>
+                          <p className="text-stone-500 truncate mt-0.5 filter-none" title={g.traitDesc}>{g.traitDesc}</p>
+                        </div>
+                      )}
+
                       {/* Compact core stats display */}
                       <div className="grid grid-cols-2 gap-1 text-[9.5px] text-artistic-ink border-t border-artistic-charcoal/20 pt-1 font-serif">
                         <div>武力: <span className="font-bold text-artistic-crimson">{g.force}</span></div>
@@ -860,11 +879,30 @@ export default function GeneralRoster({
                       <div className="w-8 h-8 rounded-none bg-artistic-charcoal/10 text-artistic-charcoal border border-artistic-charcoal/40 flex items-center justify-center font-bold font-serif text-sm shrink-0">
                         {g.avatar}
                       </div>
-                      <div className="truncate">
-                        <div className="font-serif font-black text-artistic-charcoal text-xs truncate">{g.name.split(' ')[0]}</div>
-                        <div className="text-[9.5px] text-artistic-crimson font-serif font-bold">🌾 黄金 {g.recruitCost}</div>
+                      <div className="truncate w-full">
+                        <div className="font-serif font-black text-artistic-charcoal text-xs truncate flex items-center justify-between gap-1">
+                          <span className="truncate">{g.name.split(' ')[0]}</span>
+                          <span className="shrink-0 text-[8px] bg-amber-100 border border-amber-400 text-amber-900 px-1 font-bold rounded-none scale-90">LV.{g.level}</span>
+                        </div>
+                        <div className="text-[9.5px] text-artistic-crimson font-serif font-black flex items-center justify-between mt-0.5">
+                          <span>🌾 黄金 {g.recruitCost}</span>
+                          {(() => {
+                            if (g.force >= 90) return <span className="shrink-0 text-[8px] px-1 py-0.2 bg-[#5c0f11] text-red-100 font-serif font-bold shadow-xs scale-90">🔥 神将</span>;
+                            if (g.intelligence >= 90) return <span className="shrink-0 text-[8px] px-1 py-0.2 bg-emerald-800 text-emerald-100 font-serif font-bold shadow-xs scale-90">🌌 神谋</span>;
+                            if (g.virtue >= 90) return <span className="shrink-0 text-[8px] px-1 py-0.2 bg-amber-700 text-amber-50 font-serif font-bold shadow-xs scale-90">✨ 贤名</span>;
+                            return <span className="shrink-0 text-[8px] px-1 py-0.2 bg-stone-500 text-neutral-100 font-serif font-bold scale-90">良杰</span>;
+                          })()}
+                        </div>
                       </div>
                     </div>
+
+                    {g.traitName && (
+                      <div className="mt-1 pb-1 mb-1 border-b border-dashed border-stone-200/65 text-[8.5px] leading-tight font-serif">
+                        <span className="text-[#225c34] font-extrabold">✨ {g.traitName.split(' ')[0]}</span>
+                        <p className="text-stone-550 truncate mt-0.5" title={g.traitDesc}>{g.traitDesc}</p>
+                      </div>
+                    )}
+
                     <div className="text-[9.5px] text-artistic-charcoal opacity-80 truncate mt-1 border-t border-artistic-charcoal/20 pt-1 font-serif">
                       战法: {g.skill}
                     </div>
@@ -1055,15 +1093,28 @@ export default function GeneralRoster({
               </div>
 
               {/* General Unique Trait */}
-              {displayGeneral.traitName && (
-                <div className="bg-[#f0f4ee] border border-emerald-800/20 p-2.5 rounded-none text-xs leading-normal mb-4">
-                  <div className="font-serif font-black text-emerald-850 mb-0.5 flex items-center gap-1 text-[#225c34]">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
-                    独门特质 (Unique Trait)：{displayGeneral.traitName}
+              {displayGeneral.traitName && (() => {
+                let cardClass = "bg-[#f0f4ee] border-emerald-800/20 text-[#225c34]";
+                let icon = "🟢";
+                if (displayGeneral.force >= 90) {
+                  cardClass = "bg-red-50/62 border-red-850/30 text-[#5c0f11]";
+                  icon = "🔥";
+                } else if (displayGeneral.intelligence >= 90) {
+                  cardClass = "bg-sky-50/62 border-sky-850/30 text-sky-900";
+                  icon = "🌌";
+                } else if (displayGeneral.virtue >= 90) {
+                  cardClass = "bg-amber-50/62 border-amber-850/30 text-amber-900";
+                  icon = "✨";
+                }
+                return (
+                  <div className={`border p-2.5 rounded-none text-xs leading-normal mb-4 ${cardClass}`}>
+                    <div className="font-serif font-black mb-0.5 flex items-center gap-1">
+                      <span>{icon}独门特质 (Unique Trait)：{displayGeneral.traitName}</span>
+                    </div>
+                    <p className="text-[11.5px] text-stone-800 leading-relaxed italic mt-1 font-serif">{displayGeneral.traitDesc}</p>
                   </div>
-                  <p className="text-[11px] text-stone-700 leading-relaxed italic">{displayGeneral.traitDesc}</p>
-                </div>
-              )}
+                );
+              })()}
 
               {/* 名将心声语录 */}
               <div id="general-quotes-card" className="mb-4">

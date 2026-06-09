@@ -325,66 +325,57 @@ export const GAME_SCENES: Record<string, StoryScene> = {
         text: '【武胆冲锋】持寒锋一跃出战，单骑挑杀山贼首领 (需要武力 65)',
         requirement: { attribute: 'force', minVal: 65 },
         effect: {
-          statChanges: { force: 2, prestige: 35, troops: 200 },
-          customLog: '你长啸突锋，银枪一扫崩碎两面顽盾。只一掌便将叫阵山贼首挑爆阵前！余寇肝胆碎裂败散而去。村民狂呼，大批壮勇投诚效忠（兵员+200）。'
+          statChanges: { force: 2, prestige: 35, troops: 150 }
         },
         nextSceneId: 'c1_village_force_success'
       },
       {
         id: 'c1_village_opt2',
-        text: '【弱武强攻】武功未竞大成，强行血拼寇匪 (武力 65 以下)',
-        effect: {
-          statChanges: { gold: -50, troops: -100 },
-          customLog: '你一身孤勇突阵，不慎陷入合围。虽苦战折损数十贼军，但右股中流箭创伤，终仅勉强击离。庄中家财库饷多遭抢夺，庄兵折损严重（黄金-50，折兵-100）。'
-        },
-        nextSceneId: 'c1_village_force_fail'
-      },
-      {
-        id: 'c1_village_opt3',
-        text: '【奇谋纵火】庄门假意敞开，引贼兵没入后村枯草死林，顺劲风狂烧之！ (需要智力 65)',
+        text: '【巧设火攻】诱敌深入，将贼军引入隘口纵火焚敌 (需要智力 65)',
         requirement: { attribute: 'intelligence', minVal: 65 },
         effect: {
-          statChanges: { intelligence: 2, prestige: 30, gold: 150 },
-          customLog: '你布设口袋，诱贼深侵。顺西北大风一把烈火祭起！红焰席地，寇匪烧焦烧伤无数，贼首坠马俯首请降。你收缴敌资，斩匪大获全胜（黄金+150）。'
+          statChanges: { intelligence: 2, prestige: 35 }
         },
         nextSceneId: 'c1_village_intel_success'
       },
       {
-        id: 'c1_village_opt4',
-        text: '【凡策迎敌】战略有失，排兵御敌疏漏，损兵丢谷 (智力 65 以下)',
+        id: 'c1_village_opt3',
+        text: '【以弱示敌】假装不敌诱敌，徐退诱其入关伏击 (需要统帅 60)',
+        requirement: { attribute: 'leadership', minVal: 60 },
         effect: {
-          statChanges: { gold: -80, troops: -150 },
-          customLog: '你虽然试图伏兵，无奈部下传令走漏，致使反遭狡诈山贼抄掠了仓库与老弱。虽苦战将敌逐走，庄舍受损糜烂。（黄金-80，兵员-150）。'
+          statChanges: { leadership: 2, prestige: 30 }
         },
-        nextSceneId: 'c1_village_intel_fail'
+        nextSceneId: 'c1_village_intel_success'
       }
     ]
   },
+
   'c1_village_force_success': {
     id: 'c1_village_force_success',
     chapterId: 'c1',
-    title: '银枪平寇，万世先声',
+    title: '生擒贼魁，威风一凛',
     year: 183,
-    narration: '你长驱突入敌阵，匹马救火，银枪如飞龙探海，将贼首挑飞数丈。那一幕深受庄中群豪惊敬。翌日清晨，大风止息，全村推举你为渠帅大兄，拥奉你去涿县招兵备战！',
-    historicalFact: '乱世中草创义军，多赖首领个人之悍勇。如太史慈、赵子龙皆因单骑解郡县之急，名扬幽冀。',
+    narration: '你长笑一声挺枪跃马而出，于万军之中一梭取直，长枪点中寇贼首领咽喉。众贼兵见寇魁束手，吓得魂飞魄散、四下丢弃大索逃散！你收编余众，获得当地村民的万世仰承！',
+    historicalFact: '万军阵中取上将首级，乃古代无双猛士之盖世风华。此战罢后，涿县壮士无不望风归附。',
     options: [
       {
         id: 'c1_v_fs_opt1',
-        text: '整装上马，带乡勇连夜开赴县城。',
+        text: '犒劳庄客村民，将俘虏收入行伍，开拨县城。',
         effect: {
-          statChanges: { prestige: 10, deviance: 5 }
+          statChanges: { troops: 350, gold: 100 }
         },
         nextSceneId: 'c1_town_gateway'
       }
     ]
   },
+
   'c1_village_force_fail': {
     id: 'c1_village_force_fail',
     chapterId: 'c1',
-    title: '残垣止痛，翌晨复仇',
+    title: '力竭负伤，败走残障',
     year: 183,
-    narration: '庄容损毁，你咬牙敷裹箭伤，连夜重整士卒。虽然首战争胜艰难，但村民见你赤胆，反激起了护庄大斗志。翌晨，北风止哭。你率重整精血前行前往涿县修补物资。',
-    historicalFact: '刘备首战平北沙贼人，也曾遭流箭重创，假死掩护卧草，方逃得大难。英雄百折方能不挠。',
+    narration: '你虽有一腔热血，但双拳难敌四手。在乱军攒刺中，你力竭受创，幸得庄客死命保护，才从火光熊熊的村庄突围。但也曾遭流箭重创，假死掩护卧草，方逃得大难。英雄百折方能不挠。',
+    historicalFact: '乱世无常，哪怕孤胆英雄在无尽的刀兵铁雨面前，也常有力尽受挫之时。',
     options: [
       {
         id: 'c1_v_ff_opt1',
@@ -396,6 +387,8 @@ export const GAME_SCENES: Record<string, StoryScene> = {
       }
     ]
   },
+
+
   'c1_village_intel_success': {
     id: 'c1_village_intel_success',
     chapterId: 'c1',

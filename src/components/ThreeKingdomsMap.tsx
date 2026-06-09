@@ -18,6 +18,7 @@ interface MapProps {
   exploredRegions: string[];
   annotations?: Record<string, string>;
   onUpdateAnnotation?: (regionId: string, text: string) => void;
+  tradeRoutes?: { id: string; from: string; to: string; active: boolean }[];
 }
 
 export default function ThreeKingdomsMap({
@@ -29,7 +30,8 @@ export default function ThreeKingdomsMap({
   activeQuests,
   exploredRegions,
   annotations = {},
-  onUpdateAnnotation
+  onUpdateAnnotation,
+  tradeRoutes = []
 }: MapProps) {
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(
     regions.find((r) => r.id === playerLocation) || regions[0]
@@ -177,7 +179,79 @@ export default function ThreeKingdomsMap({
                 opacity="0.9"
               />
             )}
+
+            {/* Render Active Trade Route Lines */}
+            {tradeRoutes && tradeRoutes.map((route) => {
+              const fromReg = regions.find((r) => r.id === route.from);
+              const toReg = regions.find((r) => r.id === route.to);
+              if (!fromReg || !toReg) return null;
+
+              const isBroken = fromReg.faction !== 'PLAYER' || toReg.faction !== 'PLAYER';
+              const singleIncome = Math.floor((fromReg.development + toReg.development) * 0.15 + 15);
+
+              return (
+                <g key={`trade-svg-line-${route.id}`} className="group cursor-help">
+                  <line
+                    x1={fromReg.x}
+                    y1={fromReg.y}
+                    x2={toReg.x}
+                    y2={toReg.y}
+                    stroke={isBroken ? "#e11d48" : "#10b981"}
+                    strokeWidth="2.2"
+                    strokeDasharray="5,3"
+                    className={isBroken ? "" : "animate-[dash_15s_linear_infinite]"}
+                    opacity={isBroken ? "0.35" : "0.85"}
+                  />
+                  <title>
+                    {`🐫 互市商契路网: ${fromReg.name} ⇆ ${toReg.name}\n` +
+                     `状态: ${isBroken ? "🚨 各自占控松弛 (沦陷废弛)" : "🟢 互市行商 (常态运营)"}\n` +
+                     `预测岁入: +${singleIncome} 黄金/十日`}
+                  </title>
+                </g>
+              );
+            })}
           </svg>
+
+          {/* Render Active Trade Midpoint Badges & Hover Tooltips */}
+          {tradeRoutes && tradeRoutes.map((route) => {
+            const fromReg = regions.find((r) => r.id === route.from);
+            const toReg = regions.find((r) => r.id === route.to);
+            if (!fromReg || !toReg) return null;
+
+            const midX = (fromReg.x + toReg.x) / 2;
+            const midY = (fromReg.y + toReg.y) / 2;
+            const isBroken = fromReg.faction !== 'PLAYER' || toReg.faction !== 'PLAYER';
+            const singleIncome = Math.floor((fromReg.development + toReg.development) * 0.15 + 15);
+
+            return (
+              <div
+                key={`trade-midpoint-${route.id}`}
+                className="absolute pointer-events-auto transform -translate-x-1/2 -translate-y-1/2 group z-25"
+                style={{ left: `${midX}%`, top: `${midY}%` }}
+              >
+                <div className={`flex items-center gap-1 px-1.5 py-0.5 border text-[8px] font-sans font-extrabold shadow-md rounded-none whitespace-nowrap transition-transform duration-100 cursor-help group-hover:scale-110 ${
+                  isBroken 
+                    ? 'bg-red-50 border-rose-350 text-rose-700 opacity-60' 
+                    : 'bg-emerald-50 border-emerald-500 text-emerald-800'
+                }`}>
+                  <span>{isBroken ? '🚨' : '🐫'}</span>
+                  <span>+{singleIncome}🪙</span>
+                </div>
+                {/* Floating Tooltip Card */}
+                <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-[#fcfaf2] text-[#2a2319] text-[9.5px] p-2.5 rounded-none border border-artistic-charcoal shadow-2xl transition-all duration-150 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 pointer-events-none invisible group-hover:visible min-w-[145px] font-serif z-50 text-left">
+                  <strong className="text-[#5c0f11] block border-b border-[#5c0f11]/30 pb-0.5 mb-1.5 font-black text-center">🐫 互市商契要域</strong>
+                  <div className="space-y-1 text-stone-700 leading-tight">
+                    <div className="flex justify-between"><span>往来据点:</span><span className="font-bold text-stone-900">{fromReg.name} ⇆ {toReg.name}</span></div>
+                    <div className="flex justify-between"><span>契约形态:</span><span className={isBroken ? "text-rose-600 font-bold" : "text-emerald-700 font-bold"}>{isBroken ? "🚨 各自占控松弛" : "🟢 正常互市行商"}</span></div>
+                    <div className="border-t border-dashed border-stone-300 mt-1.5 pt-1.5 flex justify-between font-bold text-stone-900">
+                      <span>十日预测收益:</span>
+                      <span className="text-emerald-700">+{singleIncome} 黄金</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
 
           {/* Marching troop line/horse avatar overlay */}
           {marchAnim && (
