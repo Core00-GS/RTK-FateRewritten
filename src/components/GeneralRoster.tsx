@@ -114,6 +114,8 @@ interface GeneralRosterProps {
   onRecruitGeneral: (generalId: string) => void;
   onTrainGeneral: (generalId: string, goldCost: number, statGained: 'force' | 'intelligence' | 'leadership' | 'politics' | 'virtue', amount: number) => void;
   onRetireGeneral: (generalId: string, legacyStatBonus: 'force' | 'intelligence' | 'leadership' | 'politics' | 'virtue', bonusAmount: number, generalName: string) => void;
+  generalStatuses?: Record<string, { health: number; status: 'NORMAL' | 'WOUNDED' | 'CAPTURED'; recoveryDays: number }>;
+  onPayRansom?: (generalId: string) => void;
 }
 
 // Detailed histories for major generals to display in the detailed biography overlay
@@ -309,7 +311,9 @@ export default function GeneralRoster({
   playerStats,
   onRecruitGeneral,
   onTrainGeneral,
-  onRetireGeneral
+  onRetireGeneral,
+  generalStatuses = {},
+  onPayRansom
 }: GeneralRosterProps) {
   const [activeTab, setActiveTab] = useState<'MY_GENERALS' | 'RECRUIT_POOL'>('MY_GENERALS');
   const [selectedGeneral, setSelectedGeneral] = useState<General | null>(null);
@@ -776,20 +780,36 @@ export default function GeneralRoster({
             {activeTab === 'MY_GENERALS' ? (
               myGenerals.length > 0 ? (
                 myGenerals.map((g) => {
+                  const gState = generalStatuses[g.id] || { health: 100, status: 'NORMAL', recoveryDays: 0 };
+                  const isWounded = gState.status === 'WOUNDED';
+                  const isCaptured = gState.status === 'CAPTURED';
                   const isCompareSelected = selectedCompareIds.includes(g.id);
+
+                  let cardBg = 'bg-artistic-cream border-artistic-charcoal/30 hover:border-artistic-charcoal';
+                  if (compareMode) {
+                    if (isCompareSelected) {
+                      cardBg = 'bg-sky-100 border-sky-600 shadow-md ring-2 ring-sky-500/20';
+                    } else {
+                      cardBg = 'bg-artistic-cream border-artistic-charcoal/30 hover:border-artistic-charcoal opacity-90';
+                    }
+                  } else if (displayGeneral?.id === g.id) {
+                    cardBg = 'bg-[#ffe4e1] border-artistic-crimson';
+                  } else if (isCaptured) {
+                    cardBg = 'bg-stone-100 border-stone-400 opacity-75';
+                  } else if (isWounded) {
+                    cardBg = 'bg-red-50/70 border-red-300';
+                  }
+
+                  const effectiveForce = isWounded ? Math.max(1, g.force - 20) : g.force;
+                  const effectiveIntelligence = isWounded ? Math.max(1, g.intelligence - 20) : g.intelligence;
+
                   return (
                     <button
                       key={g.id}
                       onClick={() => handleSelectGeneral(g)}
                       className={`p-3 rounded-none border-2 text-left transition-all cursor-pointer relative overflow-hidden ${
-                        compareMode
-                          ? isCompareSelected
-                            ? 'bg-sky-100 border-sky-600 shadow-md ring-2 ring-sky-500/20'
-                            : 'bg-artistic-cream border-artistic-charcoal/30 hover:border-artistic-charcoal opacity-90'
-                          : displayGeneral?.id === g.id
-                            ? 'bg-[#ffe4e1] border-artistic-crimson'
-                            : 'bg-artistic-cream border-artistic-charcoal/30 hover:border-artistic-charcoal'
-                      }`}
+                        isCaptured ? 'filter grayscale brightness-95' : ''
+                      } ${cardBg}`}
                     >
                       {/* Checkbox badge overlay in compare mode */}
                       {compareMode && (
@@ -805,7 +825,7 @@ export default function GeneralRoster({
                       )}
 
                       <div className="flex items-center gap-2 mb-1.5">
-                        <div className="w-8 h-8 rounded-none bg-artistic-crimson/15 text-artistic-crimson border-2 border-artistic-crimson flex items-center justify-center font-bold font-serif text-sm shadow-sm shrink-0">
+                        <div className={`w-8 h-8 rounded-none bg-artistic-crimson/15 text-artistic-crimson border-2 border-artistic-crimson flex items-center justify-center font-bold font-serif text-sm shadow-sm shrink-0 ${isCaptured ? 'filter grayscale opacity-50' : ''}`}>
                           {g.avatar}
                         </div>
                         <div className="truncate w-full">
@@ -816,6 +836,8 @@ export default function GeneralRoster({
                           <div className="text-[9px] text-artistic-charcoal/75 font-serif flex items-center justify-between gap-1 mt-0.5">
                             <span className="truncate text-[8.5px] opacity-75">等阶: 偏将</span>
                             {(() => {
+                              if (isCaptured) return <span className="shrink-0 text-[8px] px-1 py-0.2 bg-stone-700 text-stone-100 font-serif font-bold">⛓️ 槛车被俘</span>;
+                              if (isWounded) return <span className="shrink-0 text-[8px] px-1 py-0.2 bg-red-600 text-white font-serif font-bold animate-pulse">🩹 重伤静养</span>;
                               if (g.force >= 90) return <span className="shrink-0 text-[8px] px-1 py-0.2 bg-[#5c0f11] text-red-100 font-serif font-bold shadow-xs">🔥 骁勇神将</span>;
                               if (g.intelligence >= 90) return <span className="shrink-0 text-[8px] px-1 py-0.2 bg-emerald-800 text-emerald-100 font-serif font-bold shadow-xs">🌌 智伐神谋</span>;
                               if (g.virtue >= 90) return <span className="shrink-0 text-[8px] px-1 py-0.2 bg-amber-700 text-amber-50 font-serif font-bold shadow-xs">✨ 德劭名门</span>;
@@ -832,10 +854,21 @@ export default function GeneralRoster({
                         </div>
                       )}
 
+                      {isWounded && (
+                        <div className="mb-1 text-[8px] text-red-700 bg-red-50 p-1 font-serif leading-none border border-red-200">
+                          🩹 重伤 (五维扣减 20, 剩 {gState.recoveryDays} 天)
+                        </div>
+                      )}
+                      {isCaptured && (
+                        <div className="mb-1 text-[8px] text-stone-700 bg-stone-100 p-1 font-serif leading-none border border-stone-300">
+                          ⛓️ 槛车被俘 (赎金或等 {gState.recoveryDays} 天)
+                        </div>
+                      )}
+
                       {/* Compact core stats display */}
                       <div className="grid grid-cols-2 gap-1 text-[9.5px] text-artistic-ink border-t border-artistic-charcoal/20 pt-1 font-serif">
-                        <div>武力: <span className="font-bold text-artistic-crimson">{g.force}</span></div>
-                        <div>智力: <span className="font-bold text-blue-800">{g.intelligence}</span></div>
+                        <div>武力: <span className={`font-bold ${isWounded ? 'text-stone-400 line-through' : 'text-artistic-crimson'}`}>{g.force}</span>{isWounded && <span className="text-red-700 font-black ml-1">{effectiveForce}</span>}</div>
+                        <div>智力: <span className={`font-bold ${isWounded ? 'text-stone-400 line-through' : 'text-blue-800'}`}>{g.intelligence}</span>{isWounded && <span className="text-red-700 font-black ml-1">{effectiveIntelligence}</span>}</div>
                       </div>
                     </button>
                   );
@@ -936,6 +969,16 @@ export default function GeneralRoster({
                   <h3 className="font-serif font-black text-xl text-artistic-charcoal">
                     {displayGeneral.name}
                   </h3>
+                  {(() => {
+                    const gState = generalStatuses[displayGeneral.id];
+                    if (gState?.status === 'WOUNDED') {
+                      return <span className="inline-block mt-1 text-[10px] px-2 py-0.5 bg-red-600 text-white font-serif font-bold animate-pulse">🩹 【重伤卧床】 属性均扣减 20 点，不可校场督训</span>;
+                    }
+                    if (gState?.status === 'CAPTURED') {
+                      return <span className="inline-block mt-1 text-[10px] px-2 py-0.5 bg-stone-700 text-white font-serif font-bold">⛓️ 【槛车生擒】 已被关押，需等逃出或金饼赎回</span>;
+                    }
+                    return null;
+                  })()}
                   <div className="text-[10.5px] text-artistic-charcoal/90 font-serif flex justify-center gap-2 mt-1">
                     <span>阶级: 偏将虎臣</span>
                     <span>|</span>
@@ -946,7 +989,21 @@ export default function GeneralRoster({
                 {/* Radar Chart & Bonds side by side layout */}
                 <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch">
                   {/* Radar Chart (D3 SVG Pentagonal Grid) */}
-                  <GeneralRadarChart general={displayGeneral} activeBonds={activeBondsList} />
+                  <GeneralRadarChart 
+                    general={
+                      generalStatuses[displayGeneral.id]?.status === 'WOUNDED'
+                        ? {
+                            ...displayGeneral,
+                            force: Math.max(1, displayGeneral.force - 20),
+                            intelligence: Math.max(1, displayGeneral.intelligence - 20),
+                            leadership: Math.max(1, displayGeneral.leadership - 20),
+                            politics: Math.max(1, displayGeneral.politics - 20),
+                            virtue: Math.max(1, displayGeneral.virtue - 20),
+                          }
+                        : displayGeneral
+                    } 
+                    activeBonds={activeBondsList} 
+                  />
 
                   {/* Bonds Detail Column */}
                   <div className="bg-[#faf5ec] border border-artistic-charcoal/30 p-2.5 flex flex-col justify-between rounded-none font-serif text-left">
@@ -1191,42 +1248,93 @@ export default function GeneralRoster({
             <div className="border-t border-artistic-charcoal/35 pt-4">
               {recruitedSet.has(displayGeneral.id) ? (
                 <div className="space-y-3">
-                  {/* Focus training select dropdown */}
-                  <div className="bg-[#fcfaf2] border-2 border-dashed border-amber-800/20 p-2.5 rounded-none flex flex-col gap-1.5 shadow-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[11px] font-black text-amber-900 font-serif flex items-center gap-1">
-                        🎯 重点督导科目：
-                      </span>
-                      <span className="text-[9px] text-[#2a2319]/70 font-mono font-bold">
-                        (该科目加成概率极大幅度增加)
-                      </span>
-                    </div>
-                    <select
-                      value={generalFocus[displayGeneral.id] || 'none'}
-                      onChange={(e) => {
-                        const updatedFocus = { ...generalFocus, [displayGeneral.id]: e.target.value };
-                        setGeneralFocus(updatedFocus);
-                        localStorage.setItem('tk_general_training_focus_v1', JSON.stringify(updatedFocus));
-                      }}
-                      className="w-full bg-white text-stone-900 border border-artistic-charcoal py-1.5 px-2 text-xs font-serif font-black outline-none rounded-none focus:border-artistic-crimson"
-                    >
-                      <option value="none">均衡培养 (五维平均修行)</option>
-                      <option value="force">武力专修 (修习马弓枪术 - 武力)</option>
-                      <option value="intelligence">智计攻书 (研读战阵奇谋 - 智力)</option>
-                      <option value="leadership">统御三军 (演练铁壁八阵 - 统帅)</option>
-                      <option value="politics">理政吏治 (修缮农桑民生 - 政治)</option>
-                      <option value="virtue">修身立德 (亲贤礼下不坠 - 德行)</option>
-                    </select>
-                  </div>
+                  {(() => {
+                    const gState = generalStatuses[displayGeneral.id] || { health: 100, status: 'NORMAL', recoveryDays: 0 };
+                    
+                    if (gState.status === 'CAPTURED') {
+                      const ransomCost = Math.round(displayGeneral.recruitCost * 0.4);
+                      const canAfford = playerStats.gold >= ransomCost;
+                      return (
+                        <div className="bg-stone-100 p-3.5 border border-stone-300 space-y-2.5 rounded-none text-left">
+                          <p className="text-[10px] text-stone-750 font-serif leading-relaxed">
+                            ⛓️ <b>【槛车锁闭】</b> 大将【{displayGeneral.name}】于乱军搏杀中不慎被敌军俘获，当前被监禁。可随时调拨内帑黄金支付赎金将其赎回归营：
+                          </p>
+                          <div className="flex items-center justify-between text-xs font-serif font-bold pt-1 border-t border-stone-200">
+                            <span>所需赎金:</span>
+                            <span className="text-amber-800 font-extrabold">🪙 {ransomCost} 黄金</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!canAfford) {
+                                alert(`黄金不足！赎回需要 🪙 ${ransomCost}，当前内帑只有 🪙 ${playerStats.gold}。`);
+                                return;
+                              }
+                              if (onPayRansom) {
+                                onPayRansom(displayGeneral.id);
+                              }
+                            }}
+                            className={`w-full py-2 px-3 text-white font-serif font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md ${
+                              canAfford ? 'bg-amber-700 hover:bg-amber-800' : 'bg-stone-400 cursor-not-allowed'
+                            }`}
+                          >
+                            🪙 纳金赎回 (支付 {ransomCost} 黄金)
+                          </button>
+                        </div>
+                      );
+                    }
+                    
+                    if (gState.status === 'WOUNDED') {
+                      return (
+                        <div className="bg-red-50 p-3.5 border border-red-200 space-y-1 rounded-none text-left mb-2">
+                          <p className="text-[10px] text-red-800 font-serif leading-relaxed">
+                            🩹 <b>【身染重创】</b> 大将【{displayGeneral.name}】身负重创卧床静养（康复还需 {gState.recoveryDays} 天）。重伤调理期间五维大幅衰减且暂避武演，不可校场督训。
+                          </p>
+                        </div>
+                      );
+                    }
 
-                  {/* Supervise Training action button */}
-                  <button
-                    onClick={() => handleTrain(displayGeneral)}
-                    className="w-full bg-artistic-charcoal hover:bg-artistic-crimson text-artistic-bg hover:text-white py-2 px-3 rounded-none font-serif font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
-                  >
-                    <Star className="w-3.5 h-3.5 fill-current" />
-                    督导训练 (消耗 150 黄金)
-                  </button>
+                    return (
+                      <div className="space-y-3">
+                        {/* Focus training select dropdown */}
+                        <div className="bg-[#fcfaf2] border-2 border-dashed border-amber-800/20 p-2.5 rounded-none flex flex-col gap-1.5 shadow-xs text-left">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[11px] font-black text-amber-900 font-serif flex items-center gap-1">
+                              🎯 重点督导科目：
+                            </span>
+                            <span className="text-[9px] text-[#2a2319]/70 font-mono font-bold">
+                              (该科目加成概率极大幅度增加)
+                            </span>
+                          </div>
+                          <select
+                            value={generalFocus[displayGeneral.id] || 'none'}
+                            onChange={(e) => {
+                              const updatedFocus = { ...generalFocus, [displayGeneral.id]: e.target.value };
+                              setGeneralFocus(updatedFocus);
+                              localStorage.setItem('tk_general_training_focus_v1', JSON.stringify(updatedFocus));
+                            }}
+                            className="w-full bg-white text-stone-900 border border-artistic-charcoal py-1.5 px-2 text-xs font-serif font-black outline-none rounded-none focus:border-artistic-crimson"
+                          >
+                            <option value="none">均衡培养 (五维平均修行)</option>
+                            <option value="force">武力专修 (修习马弓枪术 - 武力)</option>
+                            <option value="intelligence">智计攻书 (研读战阵奇谋 - 智力)</option>
+                            <option value="leadership">统御三军 (演练铁壁八阵 - 统帅)</option>
+                            <option value="politics">理政吏治 (修缮农桑民生 - 政治)</option>
+                            <option value="virtue">修身立德 (亲贤礼下不坠 - 德行)</option>
+                          </select>
+                        </div>
+
+                        {/* Supervise Training action button */}
+                        <button
+                          onClick={() => handleTrain(displayGeneral)}
+                          className="w-full bg-artistic-charcoal hover:bg-artistic-crimson text-artistic-bg hover:text-white py-2 px-3 rounded-none font-serif font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                        >
+                          <Star className="w-3.5 h-3.5 fill-current" />
+                          督导训练 (消耗 150 黄金)
+                        </button>
+                      </div>
+                    );
+                  })()}
                   {trainingLog && (
                     <div className="bg-artistic-cream p-2.5 rounded-none text-[10.5px] text-artistic-ink border border-artistic-charcoal/40 leading-relaxed font-serif relative">
                       {trainingLog}

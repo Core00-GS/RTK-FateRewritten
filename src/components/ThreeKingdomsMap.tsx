@@ -19,6 +19,7 @@ interface MapProps {
   annotations?: Record<string, string>;
   onUpdateAnnotation?: (regionId: string, text: string) => void;
   tradeRoutes?: { id: string; from: string; to: string; active: boolean }[];
+  currentWeather?: 'CLEAR' | 'HEAVY_FOG' | 'SUDDEN_RAIN';
 }
 
 export default function ThreeKingdomsMap({
@@ -31,7 +32,8 @@ export default function ThreeKingdomsMap({
   exploredRegions,
   annotations = {},
   onUpdateAnnotation,
-  tradeRoutes = []
+  tradeRoutes = [],
+  currentWeather = 'CLEAR'
 }: MapProps) {
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(
     regions.find((r) => r.id === playerLocation) || regions[0]
@@ -132,6 +134,31 @@ export default function ThreeKingdomsMap({
             ))}
           </div>
         </div>
+
+        {/* Global Weather Forecast HUD Panel */}
+        {currentWeather && (
+          <div className="mb-3 p-2.5 bg-artistic-cream/70 border border-artistic-charcoal/35 font-serif text-[11px] leading-relaxed flex items-center justify-between gap-3 shadow-inner z-10">
+            <div className="flex items-center gap-2">
+              <span className="text-xl shrink-0">
+                {currentWeather === 'CLEAR' ? '☀️' : currentWeather === 'HEAVY_FOG' ? '🌫️' : '🌧️'}
+              </span>
+              <div>
+                <div className="font-serif font-black text-[12px] text-artistic-charcoal leading-none">
+                  天下大局气象：【{currentWeather === 'CLEAR' ? '风和日丽' : currentWeather === 'HEAVY_FOG' ? '浓雾漫天' : '骤雨倾盆'}】
+                </div>
+                <div className="text-[9.5px] text-stone-600 opacity-90 leading-tight mt-1">
+                  {currentWeather === 'CLEAR' && "☀️ 天时平和，行军畅通如常。探马视野极佳，两军对阵可视范围广。"}
+                  {currentWeather === 'HEAVY_FOG' && "🌫️ 【浓雾阻途】能见度降至两丈！极易迷失山路、延误日程，行军时耗追加 +3 日！"}
+                  {currentWeather === 'SUDDEN_RAIN' && "🌧️ 【暴雨路阻】平地起泥泽，江河狂涨！辎重深陷泥泞，行军时耗追加 +4 日！"}
+                </div>
+              </div>
+            </div>
+            <div className="shrink-0 text-right leading-none bg-artistic-bg px-2 py-1.5 border border-stone-300 font-mono text-[9px] text-artistic-crimson font-black">
+              <div>行军追加: {currentWeather === 'CLEAR' ? '+0 日' : currentWeather === 'HEAVY_FOG' ? '+3 日' : '+4 日'}</div>
+              <div className="mt-1 opacity-80 text-stone-700">迷雾可见: {currentWeather === 'CLEAR' ? '极高' : '极低'}</div>
+            </div>
+          </div>
+        )}
 
         {/* Dynamic SVG Canvas Map */}
         <div className="relative w-full aspect-[4/3] border-2 border-artistic-charcoal bg-artistic-cream rounded-none overflow-hidden my-auto shadow-inner">
@@ -512,9 +539,14 @@ export default function ThreeKingdomsMap({
                             : `🔭 斥候哨骑开道：移驻 ${selectedRegion.name}`
                           }
                         </button>
-                        <p className="w-full text-[9px] text-[#5c0f11] italic font-serif leading-none mt-1">
-                          * 急行军消耗较轻：25 黄金军饷、6 日程。
-                        </p>
+                        <div className="w-full text-[9px] text-[#5c0f11] font-serif leading-relaxed mt-1">
+                          <p className="font-bold flex items-center gap-1">💂 行军军力推衍：</p>
+                          <ul className="list-disc pl-3.5 space-y-0.5">
+                            <li>军饷消耗：{playerStats.month === 12 ? 15 : 25} 黄金军饷</li>
+                            <li>行耗工期：{6 + (currentWeather === 'HEAVY_FOG' ? 3 : currentWeather === 'SUDDEN_RAIN' ? 4 : 0)} 天 (基数 6 天 {currentWeather !== 'CLEAR' && `+ 气象 ${currentWeather === 'HEAVY_FOG' ? '浓雾' : '暴雨'} 延滞 +${currentWeather === 'HEAVY_FOG' ? '3' : '4'} 天`})</li>
+                            <li>敌防阵线能见度：{currentWeather === 'CLEAR' ? '👀 风和日丽视野开阔' : currentWeather === 'HEAVY_FOG' ? '🌫️ 大雾迷江视野低微' : '🌧️ 骤雨泥泞箭矢阻断'}</li>
+                          </ul>
+                        </div>
                       </div>
                     )}
                   </div>

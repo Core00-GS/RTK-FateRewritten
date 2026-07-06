@@ -19,6 +19,7 @@ import RandomEventsTab from './components/RandomEventsTab';
 import CivilianModsTab from './components/CivilianModsTab';
 import TrainingTab from './components/TrainingTab';
 import AnimatedCounter from './components/AnimatedCounter';
+import { motion, AnimatePresence } from 'motion/react';
 import { sfx } from './utils/audio';
 import { migrateSaveData } from './utils/saveMigration';
 import { SOLAR_ACHIEVEMENTS } from './data/achievements';
@@ -32,6 +33,44 @@ import {
 
 const SAVE_KEY = 'three_kingdoms_retro_alt_save_v2';
 const INITIAL_GENERAL_DEFAULTS = JSON.parse(JSON.stringify(INITIAL_GENERAL_POOL));
+
+interface WeatherDetails {
+  name: string;
+  icon: string;
+  speedModifierDays: number;
+  description: string;
+  visibilityDesc: string;
+}
+
+const WEATHER_DETAILS: Record<'CLEAR' | 'HEAVY_FOG' | 'SUDDEN_RAIN', {
+  name: string;
+  icon: string;
+  speedModifierDays: number;
+  description: string;
+  visibilityDesc: string;
+}> = {
+  CLEAR: {
+    name: '风和日丽',
+    icon: '☀️',
+    speedModifierDays: 0,
+    description: '天时平和，行进畅通如常。探马视野极佳，两军对阵可视范围广。',
+    visibilityDesc: '👀 两军阵仗分明，攻防视界极为开阔，羽翎箭矢指哪打哪。'
+  },
+  HEAVY_FOG: {
+    name: '大雾弥漫',
+    icon: '🌫️',
+    speedModifierDays: 3,
+    description: '能见度极低！军旅跋涉极易迷失行径，行军追加限制 +3 日！',
+    visibilityDesc: '🌫️ 浓雾锁地，百步之外人畜难辨，羽林军强弩无法直射。'
+  },
+  SUDDEN_RAIN: {
+    name: '暴雨骤至',
+    icon: '🌧️',
+    speedModifierDays: 4,
+    description: '平地起泥泽，江河泛滥！辎重队伍推行极难，行军追加限制 +4 日！',
+    visibilityDesc: '🌧️ 骤雨狂砸，地表雨横泥滑，两军将士皆无法看清对方帅旗！'
+  }
+};
 
 interface SolarTermInfo {
   name: string;
@@ -278,6 +317,8 @@ export default function App() {
   // --- Secret Click Egg / Test Mode & Password States ---
   const [sanCount, setSanCount] = useState<number>(0);
   const [guoCount, setGuoCount] = useState<number>(0);
+  const sanClickRef = useRef<number>(0);
+  const guoClickRef = useRef<number>(0);
   const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
   const [showPlayerModal, setShowPlayerModal] = useState<boolean>(false);
   const [passwordInput, setPasswordInput] = useState<string>('');
@@ -327,6 +368,25 @@ export default function App() {
 
   // --- Core Lists ---
   const [recruitedGenerals, setRecruitedGenerals] = useState<string[]>([]);
+  const [generalStatuses, setGeneralStatuses] = useState<Record<string, { health: number; status: 'NORMAL' | 'WOUNDED' | 'CAPTURED'; recoveryDays: number }>>(() => {
+    try {
+      const saved = localStorage.getItem('tk_general_statuses_v1');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error("Failed to parse general statuses:", e);
+    }
+    return {};
+  });
+  const [showQuickSaveFlash, setShowQuickSaveFlash] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (showQuickSaveFlash) {
+      const timer = setTimeout(() => {
+        setShowQuickSaveFlash(false);
+      }, 2200);
+      return () => clearTimeout(timer);
+    }
+  }, [showQuickSaveFlash]);
   const [completedQuests, setCompletedQuests] = useState<string[]>([]);
   const [activeQuests, setActiveQuests] = useState<string[]>([]);
   const [regions, setRegions] = useState<Region[]>(INITIAL_REGIONS);
@@ -374,11 +434,73 @@ export default function App() {
     localStorage.setItem('tk_trade_routes', JSON.stringify(tradeRoutes));
   }, [tradeRoutes]);
 
+  // Synchronized recovery day ticks for wounded/captured generals
+  const prevDateRef = useRef<{ year: number, month: number, day: number } | null>(null);
+
+  useEffect(() => {
+    if (gameState === 'INTRO' || gameState === 'MAIN_MENU') return;
+    const currentDate = { year: playerStats.year, month: playerStats.month, day: playerStats.day };
+    if (!prevDateRef.current) {
+      prevDateRef.current = currentDate;
+      return;
+    }
+
+    const prev = prevDateRef.current;
+    prevDateRef.current = currentDate;
+
+    // Calculate elapsed days
+    const elapsedDays = (currentDate.year - prev.year) * 360 + (currentDate.month - prev.month) * 30 + (currentDate.day - prev.day);
+    if (elapsedDays <= 0) return;
+
+    setGeneralStatuses(prevStatuses => {
+      let changed = false;
+      const nextStatuses = { ...prevStatuses };
+
+      Object.keys(nextStatuses).forEach(id => {
+        const gen = nextStatuses[id];
+        if (gen.status === 'WOUNDED' || gen.status === 'CAPTURED') {
+          const prevDays = gen.recoveryDays;
+          const nextDays = Math.max(0, gen.recoveryDays - elapsedDays);
+          if (nextDays !== prevDays) {
+            changed = true;
+            if (nextDays === 0) {
+              // General is healed/escaped!
+              nextStatuses[id] = {
+                health: 100,
+                status: 'NORMAL',
+                recoveryDays: 0
+              };
+              const genObj = INITIAL_GENERAL_POOL[id];
+              const nameStr = genObj ? genObj.name : "麾下大将";
+              if (gen.status === 'WOUNDED') {
+                showToast(`✨ 【重伤痊愈】大将【${nameStr}】重伤已调理痊愈，披挂整齐重新归营校场！`);
+              } else {
+                showToast(`✨ 【槛车逃回】大将【${nameStr}】乘夜杀死看守，突出重围逃回幕府营中！`);
+              }
+            } else {
+              nextStatuses[id] = {
+                ...gen,
+                recoveryDays: nextDays
+              };
+            }
+          }
+        }
+      });
+
+      if (changed) {
+        localStorage.setItem('tk_general_statuses_v1', JSON.stringify(nextStatuses));
+        return nextStatuses;
+      }
+      return prevStatuses;
+    });
+  }, [playerStats.year, playerStats.month, playerStats.day, gameState]);
+
   const [activeStance, setActiveStance] = useState<'BALANCED' | 'OFFENSIVE' | 'DEFENSIVE'>('BALANCED');
   const [battleFormation, setBattleFormation] = useState<'TORTOISE' | 'PHALANX' | 'ARCHER_WALL'>('TORTOISE');
   const [taxCooldown, setTaxCooldown] = useState<boolean>(false);
   const [playerLocation, setPlayerLocation] = useState<string>('zhuojun');
   const [exploredRegions, setExploredRegions] = useState<string[]>(['zhuojun']);
+  const [currentWeather, setCurrentWeather] = useState<'CLEAR' | 'HEAVY_FOG' | 'SUDDEN_RAIN'>('CLEAR');
 
   // --- Battle Logs State ---
   const [battleLogs, setBattleLogs] = useState<Array<{
@@ -951,7 +1073,7 @@ export default function App() {
   }, []);
 
   // --- Save / Load Handlers ---
-  const saveGame = () => {
+  const saveGame = (isManual: boolean = false) => {
     const data = {
       version: '2.0',
       stats: playerStats,
@@ -966,15 +1088,21 @@ export default function App() {
       playerLocation,
       gameState,
       exploredRegions,
+      currentWeather,
       annotations: regionAnnotations,
       unlockedAchievements,
       relations: diplomacyRelations,
       questsList,
       lastCheckedDate,
-      runId
+      runId,
+      generalStatuses
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-    showToast("【开库奏报】军情行纪已妥善封存入阁，可随时在主屏幕载入！");
+    if (isManual) {
+      setShowQuickSaveFlash(true);
+    } else {
+      showToast("【开库奏报】军情行纪已妥善封存入阁，可随时在主屏幕载入！");
+    }
   };
 
   const importFileRef = useRef<HTMLInputElement>(null);
@@ -1099,7 +1227,7 @@ export default function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        saveGameRef.current();
+        saveGameRef.current(true); // manual save is true!
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -1113,7 +1241,7 @@ export default function App() {
     if (gameState === 'INTRO' || gameState === 'MAIN_MENU') return;
     const interval = setInterval(() => {
       if (gameState !== 'INTRO' && gameState !== 'MAIN_MENU') {
-        saveGameRef.current();
+        saveGameRef.current(false); // auto save is false!
         // Toast and icon animation trigger
         showToast("【太史筒册】天命昭雪行纪已由史官自动誊抄毕，封存存档。");
         setAutoSaveActive(true);
@@ -1154,6 +1282,11 @@ export default function App() {
       setRegionAnnotations(data.annotations || {});
       setUnlockedAchievements(data.unlockedAchievements || []);
       setGameState(data.gameState || 'STORY');
+      if (data.currentWeather) {
+        setCurrentWeather(data.currentWeather);
+      } else {
+        setCurrentWeather('CLEAR');
+      }
       if (data.relations) {
         setDiplomacyRelations(data.relations);
       }
@@ -1167,6 +1300,13 @@ export default function App() {
         setRunId(data.runId);
       } else {
         setRunId('run_' + Date.now());
+      }
+      if (data.generalStatuses) {
+        setGeneralStatuses(data.generalStatuses);
+        localStorage.setItem('tk_general_statuses_v1', JSON.stringify(data.generalStatuses));
+      } else {
+        setGeneralStatuses({});
+        localStorage.removeItem('tk_general_statuses_v1');
       }
 
       if (wasMigrated) {
@@ -1681,6 +1821,27 @@ export default function App() {
             change = change - extraLoss; // Increase losses
             showToast(`🏹 【锋矢阵·冲攻多折】锋线过于突出暴露，乱军搏杀中额外增加 15% 精卒兵员折损 (多折损了 ${extraLoss} 精锐)！`);
           }
+
+          // Apply weather-formation synergy bonus!
+          let weatherSynergyBonus = 0;
+          let weatherSynergyMsg = '';
+
+          if (battleFormation === 'TORTOISE' && currentWeather === 'HEAVY_FOG') {
+            weatherSynergyBonus = 0.25; // 25% additional casualty reduction
+            weatherSynergyMsg = `🌫️ 【天时·大雾协同】浓雾天时弥漫，我军结「金甲龟宿阵」多得雾蔼掩护，额外规避 25% 兵力折损！`;
+          } else if (battleFormation === 'PHALANX' && currentWeather === 'SUDDEN_RAIN') {
+            weatherSynergyBonus = 0.20; // 20% additional casualty reduction
+            weatherSynergyMsg = `🌧️ 【天时·暴雨协同】暴雨泥泞难行，敌骑机动受阻，我军「重锋刺枪阵」两翼格外坚实，额外规避 20% 兵力折损！`;
+          } else if (battleFormation === 'ARCHER_WALL' && currentWeather === 'CLEAR') {
+            weatherSynergyBonus = 0.15; // 15% additional casualty reduction
+            weatherSynergyMsg = `☀️ 【天时·晴空协同】晴天碧野，视界极佳，我军「万弩箭墙阵」封锁线牢不可破，额外规避 15% 兵力折损！`;
+          }
+
+          if (weatherSynergyBonus > 0) {
+            const savedByWeather = Math.round(Math.abs(change) * weatherSynergyBonus);
+            change = change + savedByWeather;
+            showToast(weatherSynergyMsg + ` (免除了 ${savedByWeather} 员士卒折损)`);
+          }
         }
 
         const currentVal = tempStats[key as keyof PlayerStats];
@@ -1910,6 +2071,92 @@ export default function App() {
           isWin ? 'VICTORY' : 'DEFEAT',
           lost
         );
+
+        // General wounding/capturing probability check
+        if (recruitedGenerals.length > 0) {
+          const updatedStatuses = { ...generalStatuses };
+          let changed = false;
+          let newLogMessages: Array<{ id: string; chapterId: string; timestamp: string; message: string; type: 'action' | 'casualty' | 'gain' | 'random_event' }> = [];
+
+          // Only affect generals who are currently NORMAL
+          const eligibleIds = recruitedGenerals.filter(id => {
+            const s = updatedStatuses[id] || { health: 100, status: 'NORMAL', recoveryDays: 0 };
+            return s.status === 'NORMAL';
+          });
+
+          if (eligibleIds.length > 0) {
+            // Pick 1 general (or 2 if roster is large) to take battle damage
+            const numAffected = Math.min(eligibleIds.length, Math.random() < 0.45 ? 2 : 1);
+            const shuffled = [...eligibleIds].sort(() => 0.5 - Math.random());
+            
+            for (let i = 0; i < numAffected; i++) {
+              const genId = shuffled[i];
+              const currentS = updatedStatuses[genId] || { health: 100, status: 'NORMAL', recoveryDays: 0 };
+              
+              // Damage depends on victory vs defeat
+              const damage = isWin 
+                ? Math.floor(Math.random() * 21 + 20)  // 20-40 damage
+                : Math.floor(Math.random() * 31 + 35); // 35-65 damage
+              
+              const nextHealth = Math.max(0, currentS.health - damage);
+              const genObj = INITIAL_GENERAL_POOL[genId];
+              const genName = genObj ? genObj.name : "麾下大将";
+
+              if (nextHealth <= 0) {
+                // health reaches zero: probability of getting captured or wounded
+                const isCapturedProb = Math.random() < (isWin ? 0.20 : 0.50); // higher capture rate on defeat
+                if (isCapturedProb) {
+                  updatedStatuses[genId] = {
+                    health: 100, // resets on escape/ransom
+                    status: 'CAPTURED',
+                    recoveryDays: Math.floor(Math.random() * 7 + 6) // Captured for 6-12 days
+                  };
+                  newLogMessages.push({
+                    id: 'gen_cap_' + genId + '_' + Date.now(),
+                    chapterId: currentChapterId,
+                    timestamp: `公元${finalStats.year}年${finalStats.month}月${finalStats.day}日`,
+                    message: `⛓️【槛车生擒】大将【${genName}】于鏖战突围中力竭落马，不慎被敌军生擒，已被关入押运大车！可前往大营备纳赎金营救！`,
+                    type: 'casualty'
+                  });
+                } else {
+                  updatedStatuses[genId] = {
+                    health: 40,
+                    status: 'WOUNDED',
+                    recoveryDays: Math.floor(Math.random() * 6 + 4) // Wounded for 4-9 days
+                  };
+                  newLogMessages.push({
+                    id: 'gen_wnd_' + genId + '_' + Date.now(),
+                    chapterId: currentChapterId,
+                    timestamp: `公元${finalStats.year}年${finalStats.month}月${finalStats.day}日`,
+                    message: `🩹【重伤抬回】大将【${genName}】于乱军厮杀中身染重创，被亲兵拼死抬回，暂入伤病营静养治疗。`,
+                    type: 'casualty'
+                  });
+                }
+              } else {
+                updatedStatuses[genId] = {
+                  ...currentS,
+                  health: nextHealth
+                };
+                newLogMessages.push({
+                  id: 'gen_dmg_' + genId + '_' + Date.now(),
+                  chapterId: currentChapterId,
+                  timestamp: `公元${finalStats.year}年${finalStats.month}月${finalStats.day}日`,
+                  message: `⚔️【浴血沙场】大将【${genName}】于战斗中浴血斩将，体力折损 ${damage} 点，当前生命值: ${nextHealth}%。`,
+                  type: 'action'
+                });
+              }
+              changed = true;
+            }
+          }
+
+          if (changed) {
+            setGeneralStatuses(updatedStatuses);
+            localStorage.setItem('tk_general_statuses_v1', JSON.stringify(updatedStatuses));
+            if (newLogMessages.length > 0) {
+              setBattleLogs(prev => [...newLogMessages, ...prev]);
+            }
+          }
+        }
       }
     }
 
@@ -1970,6 +2217,17 @@ export default function App() {
     setPlayerLocation(regionId);
     setExploredRegions(prev => prev.includes(regionId) ? prev : [...prev, regionId]);
     
+    // Global Weather Random Trigger
+    const rand = Math.random();
+    let nextWeather: 'CLEAR' | 'HEAVY_FOG' | 'SUDDEN_RAIN' = 'CLEAR';
+    if (rand < 0.25) {
+      nextWeather = 'HEAVY_FOG';
+    } else if (rand < 0.50) {
+      nextWeather = 'SUDDEN_RAIN';
+    }
+    setCurrentWeather(nextWeather);
+    const wDetail = WEATHER_DETAILS[nextWeather];
+    
     const term = SOLAR_TERMS_MAP[playerStats.month] || {
       name: '常规节气',
       icon: '🌍',
@@ -1980,8 +2238,10 @@ export default function App() {
       effectDescription: '风平浪静，行止如意'
     };
 
+    const totalDays = term.marchingSpeedDays + wDetail.speedModifierDays;
+
     setPlayerStats(prev => {
-      const advanced = advanceTime(term.marchingSpeedDays, prev);
+      const advanced = advanceTime(totalDays, prev);
       return {
         ...prev,
         ...advanced,
@@ -1992,11 +2252,14 @@ export default function App() {
     const rName = regions.find(r => r.id === regionId)?.name || '';
     const dateStr = `公元${playerStats.year}年${playerStats.month}月${playerStats.day}日`;
     
+    // Construct elaborate logistics & battlefield visibility comment depending on weather
+    let weatherLogComment = `。天气【${wDetail.name} ${wDetail.icon}】：${wDetail.description} 战局能见度：${wDetail.visibilityDesc}`;
+    
     const travelLog = {
       id: `travel_${Date.now()}`,
       chapterId: currentChapterId,
       timestamp: dateStr,
-      message: `🐎 【行军进驻】主公逢节气【${term.name} ${term.icon}】率护军精骑出发，由于“${term.effectDescription}”，耗时 ${term.marchingSpeedDays} 日，支出军饷金数 -${term.marchingCostGold}。队伍顺利安扎于地区【${rName}】。`,
+      message: `🐎 【行军进驻】主公率护军精骑出发，逢节气【${term.name} ${term.icon}】而遇天气【${wDetail.name} ${wDetail.icon}】。受${wDetail.name}及“${term.effectDescription}”共同作用，总耗时 ${totalDays} 日（其中含天气延误 ${wDetail.speedModifierDays} 天），开支饷金 -${term.marchingCostGold}。大部人马已于地区【${rName}】按律安防${weatherLogComment}`,
       type: 'action' as const
     };
     setBattleLogs(prev => [travelLog, ...prev]);
@@ -2115,6 +2378,48 @@ export default function App() {
     };
     setBattleLogs(prev => [retireLog, ...prev]);
     showToast(`📜 【传承红利】属性永久提升 +${bonusValue}！`);
+  };
+
+  const handlePayRansom = (generalId: string) => {
+    const genObj = INITIAL_GENERAL_POOL[generalId];
+    if (!genObj) return;
+
+    const ransomCost = Math.round(genObj.recruitCost * 0.4);
+    if (playerStats.gold < ransomCost) {
+      showToast(`❌ 黄金粮秣不足！赎救所需 🪙 ${ransomCost} 黄金。`);
+      return;
+    }
+
+    // Deduct gold
+    setPlayerStats(prev => ({
+      ...prev,
+      gold: Math.max(0, prev.gold - ransomCost)
+    }));
+
+    // Update statuses
+    setGeneralStatuses(prev => {
+      const next = {
+        ...prev,
+        [generalId]: {
+          health: 100,
+          status: 'NORMAL' as const,
+          recoveryDays: 0
+        }
+      };
+      localStorage.setItem('tk_general_statuses_v1', JSON.stringify(next));
+      return next;
+    });
+
+    const dateStr = `公元${playerStats.year}年${playerStats.month}月${playerStats.day}日`;
+    const rsmLog = {
+      id: `ransom_${Date.now()}`,
+      chapterId: currentChapterId,
+      timestamp: dateStr,
+      message: `🪙【纳金赎救】主公核发赎金 🪙 ${ransomCost} 黄金，通商赎回被擒大将【${genObj.name}】归营。三军欢呼擂鼓，全军士气高涨！`,
+      type: 'gain' as const
+    };
+    setBattleLogs(prev => [rsmLog, ...prev]);
+    showToast(`✨ 【纳金赎救】成功解救大将【${genObj.name}】归营！`);
   };
 
   // --- Economic governance updates ---
@@ -2319,11 +2624,17 @@ export default function App() {
             <span 
               onClick={() => {
                 sfx.playClick();
-                const nextVal = sanCount + 1;
-                setSanCount(nextVal);
-                if (nextVal === 3 && guoCount === 8) {
+                sanClickRef.current += 1;
+                const currentSan = sanClickRef.current;
+                const currentGuo = guoClickRef.current;
+                setSanCount(currentSan);
+                if (currentSan >= 3 && currentGuo >= 8) {
                   setShowPasswordModal(true);
                   setPasswordInput('');
+                  sanClickRef.current = 0;
+                  guoClickRef.current = 0;
+                  setSanCount(0);
+                  setGuoCount(0);
                 }
               }} 
               className="cursor-pointer hover:text-artistic-crimson transition-all border-b border-dashed border-transparent hover:border-artistic-crimson"
@@ -2334,11 +2645,17 @@ export default function App() {
             <span 
               onClick={() => {
                 sfx.playClick();
-                const nextVal = guoCount + 1;
-                setGuoCount(nextVal);
-                if (sanCount === 3 && nextVal === 8) {
+                guoClickRef.current += 1;
+                const currentSan = sanClickRef.current;
+                const currentGuo = guoClickRef.current;
+                setGuoCount(currentGuo);
+                if (currentSan >= 3 && currentGuo >= 8) {
                   setShowPasswordModal(true);
                   setPasswordInput('');
+                  sanClickRef.current = 0;
+                  guoClickRef.current = 0;
+                  setSanCount(0);
+                  setGuoCount(0);
                 }
               }} 
               className="cursor-pointer hover:text-artistic-crimson transition-all border-b border-dashed border-transparent hover:border-artistic-crimson"
@@ -2869,8 +3186,17 @@ export default function App() {
           </div>
 
           {/* Output dynamic active state subpanel layout */}
-          <div className="transition-all animate-fade-in flex-1">
-            {gameState === 'STORY' && (
+          <div className="flex-1">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={gameState}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+                className="w-full h-full"
+              >
+                {gameState === 'STORY' && (
               /* Story Screen layout split panels */
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Active story dialogue scene */}
@@ -3160,6 +3486,147 @@ export default function App() {
                         ))}
                       </div>
 
+                      {/* --- 心法阵姿 / Stance Selector Component --- */}
+                      <div className="mb-3.5 pb-3 border-b border-dashed border-stone-200 font-serif">
+                        <div className="flex justify-between items-center mb-1.5">
+                          <span className="text-[10px] uppercase tracking-wider font-bold text-stone-700 bg-red-100/30 px-1.5 py-0.5 border border-dashed border-red-300">
+                            ⚔️ 战地行营大势 / Battle Stance Selector
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          {[
+                            { id: 'OFFENSIVE', label: '⚔️ 悍攻 stance', displayName: '悍攻 (Aggressive)', desc: '锋矢攻势：决策战损加剧 +15%，配合沙盘奇袭大捷' },
+                            { id: 'BALANCED', label: '🔱 均势 stance', displayName: '均势 (Standard)', desc: '方圆常态：攻防相济，各项兵耗岁运常态平稳' },
+                            { id: 'DEFENSIVE', label: '🛡️ 游避 stance', displayName: '游避 (Evasive)', desc: '鹤翼逃阵：豁免减免 -30% 敌寇决战重伤兵损' }
+                          ].map((st) => (
+                            <button
+                              key={st.id}
+                              type="button"
+                              onClick={() => {
+                                sfx.playDrum();
+                                setActiveStance(st.id as any);
+                                showToast(`💂 【大帅敕命】全军令：攻守战地大势改换为「${st.displayName}」！`);
+                                const dateStr = `公元${playerStats.year}年${playerStats.month}月${playerStats.day}日`;
+                                setBattleLogs(prev => [
+                                  {
+                                    id: 'stance_chg_' + Date.now(),
+                                    chapterId: currentChapterId,
+                                    timestamp: dateStr,
+                                    message: `🎯 【大帅传檄】主公变更阵营列防大势，全体执戟精骑转为「${st.displayName}」身法。该宿命战意将即刻扭转后续战役与决策遭遇战的所有大军战损权衡！`,
+                                    type: 'action' as const
+                                  },
+                                  ...prev
+                                ]);
+                              }}
+                              className={`py-1 px-1 flex flex-col items-center justify-center transition-all cursor-pointer rounded-none text-center border text-[9.5px] leading-tight font-black ${
+                                activeStance === st.id
+                                  ? 'bg-artistic-charcoal border-artistic-charcoal text-white font-black shadow-xs'
+                                  : 'bg-transparent border-stone-300 text-stone-600 hover:bg-stone-100'
+                              }`}
+                              title={st.desc}
+                            >
+                              <span>{st.displayName.split(' ')[0]}</span>
+                              <span className="text-[7.5px] font-normal opacity-85">{st.displayName.split(' ')[1]}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="text-[8.5px] text-stone-500 font-serif leading-relaxed mt-1 text-center italic">
+                          {activeStance === 'OFFENSIVE' && "⚠️ 悍不畏死：决策大损额外 +15%，但可冲锋制霸。"}
+                          {activeStance === 'BALANCED' && "⚖️ 平衡大局：各项消耗折算均维持正常基准常数。"}
+                          {activeStance === 'DEFENSIVE' && "🛡️ 避实击虚：全权豁免 -30% 敌我决算时的兵力战损！"}
+                        </div>
+                      </div>
+
+                      {/* --- 军机密府快捷令 / Story Quick Actions Component --- */}
+                      <div className="mb-3.5 pb-3 border-b border-dashed border-stone-200">
+                        <div className="text-[10px] uppercase tracking-wider font-bold text-stone-750 bg-emerald-50 px-1.5 py-0.5 border border-dashed border-emerald-300 font-serif mb-1.5 flex justify-between">
+                          <span>幕府军机快捷令 / Quick Actions</span>
+                          <span className="text-emerald-700 font-black">免切界面</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          {/* Quick Recruit */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const cost = 120;
+                              if (playerStats.gold < cost) {
+                                alert("国库黄金储备空虚！快捷募集骁勇新卒需要 120 黄金储备。");
+                                return;
+                              }
+                              const draftAmount = Math.floor(Math.random() * 150) + 300; // 300-450 soldiers
+                              handleGovAction(
+                                'RECRUIT',
+                                cost,
+                                {
+                                  troops: playerStats.troops + draftAmount,
+                                  leadership: playerStats.leadership + 1
+                                },
+                                playerLocation
+                              );
+                              showToast(`💂 【快捷军务】成功自榜白丁中募勇精骑 +${draftAmount} 人，主公统帅资质上升！`);
+                            }}
+                            className="p-1 px-0.5 text-[9px] border border-emerald-600/30 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 font-serif font-black flex flex-col items-center justify-center transition-all cursor-pointer rounded-none text-center"
+                            title="花费 120 黄金，速召义兵 300~450 骑，统帅 +1，行进及操训 10 日"
+                          >
+                            <span className="font-bold">💂 征调新卒</span>
+                            <span className="text-[8px] font-normal opacity-75 font-mono mt-0.5">-120🪙</span>
+                          </button>
+
+                          {/* Quick Tillage */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const cost = 150;
+                              if (playerStats.gold < cost) {
+                                alert("国库黄金储备不足！发展屯田需 150 黄金。");
+                                return;
+                              }
+                              handleGovAction(
+                                'TILLAGE',
+                                cost,
+                                {
+                                  politics: playerStats.politics + 1
+                                },
+                                playerLocation
+                              );
+                              showToast(`🌾 【快捷军务】成功督令治下守卒于驻地屯荒，主公政治资质上升！`);
+                            }}
+                            className="p-1 px-0.5 text-[9px] border border-amber-600/30 bg-amber-50 hover:bg-amber-100 text-amber-950 font-serif font-black flex flex-col items-center justify-center transition-all cursor-pointer rounded-none text-center"
+                            title="花费 150 黄金，开荒屯田提升驻地岁收比例，政治 +1，行营及修整 10 日"
+                          >
+                            <span className="font-bold">🌾 屯开林荒</span>
+                            <span className="text-[8px] font-normal opacity-75 font-mono mt-0.5">-150🪙</span>
+                          </button>
+
+                          {/* Quick Relief */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const cost = 150;
+                              if (playerStats.gold < cost) {
+                                alert("营内黄金不足，筹措不起开粥善行！");
+                                return;
+                              }
+                              handleGovAction(
+                                'RELIEF',
+                                cost,
+                                {
+                                  virtue: playerStats.virtue + 1,
+                                  prestige: playerStats.prestige + 45
+                                },
+                                playerLocation
+                              );
+                              showToast(`🍲 【快捷军务】大开义仓赈救塞外受寒流落饥民，德功大满，声望暴增 +45！`);
+                            }}
+                            className="p-1 px-0.5 text-[9px] border border-rose-600/30 bg-rose-50/60 hover:bg-rose-100 text-rose-950 font-serif font-black flex flex-col items-center justify-center transition-all cursor-pointer rounded-none text-center"
+                            title="花费 150 黄金，大搭灾粥棚招安饥民，德行 +1，声望大涨 +45，时越 10 日"
+                          >
+                            <span className="font-bold">🍲 施粥饱赈</span>
+                            <span className="text-[8px] font-normal opacity-75 font-mono mt-0.5">-150🪙</span>
+                          </button>
+                        </div>
+                      </div>
+
                       {/* --- 战场特技 栏 (Battlefield Stance Commands) --- */}
                       <div className="mb-3.5 pb-3 border-b border-dashed border-stone-200">
                         <div className="flex justify-between items-center mb-1.5">
@@ -3266,7 +3733,29 @@ export default function App() {
                                       {log.type === 'casualty' ? '战损' : log.type === 'gain' ? '辎重纳新' : log.type === 'random_event' ? '奇遇' : '军事令'}
                                     </span>
                                   </div>
-                                  <p className="font-serif text-[10.5px] leading-snug">{log.message}</p>
+                                  <p className="font-serif text-[10.5px] leading-snug">
+                                    {(() => {
+                                      let formatted = log.message;
+
+                                      // Damage types highlighting
+                                      formatted = formatted.replace(/(火计|火烧|焚烧|烈火|烟煤火计|烈炎)/g, '<span class="text-red-600 font-extrabold font-serif">🔥$1</span>');
+                                      formatted = formatted.replace(/(暗箭|飞羽|流矢|攒射|箭雨|强弩)/g, '<span class="text-purple-600 font-black font-serif">🏹$1</span>');
+                                      formatted = formatted.replace(/(落石|礌石|滚木|巨石)/g, '<span class="text-amber-800 font-extrabold font-serif">🪨$1</span>');
+                                      formatted = formatted.replace(/(奇袭|伏兵|包抄|刺枪|伏击|攒杀|突刺)/g, '<span class="text-rose-700 font-extrabold font-serif">⚡$1</span>');
+
+                                      // Status effects highlighting
+                                      formatted = formatted.replace(/(重伤抬回|重创|身染重创|身负重创|伤亡|重伤)/g, '<span class="text-red-700 bg-red-50 border border-red-200 px-1 py-0.2 font-extrabold font-serif">🩹$1</span>');
+                                      formatted = formatted.replace(/(生擒|槛车|槛车生擒|关押|被俘|囚禁)/g, '<span class="text-stone-700 bg-stone-100 border border-stone-300 px-1 py-0.2 font-extrabold font-serif">⛓️$1</span>');
+                                      formatted = formatted.replace(/(痊愈|调理痊愈|恢复|康复)/g, '<span class="text-emerald-700 font-extrabold font-serif">✨$1</span>');
+                                      formatted = formatted.replace(/(大雾协同|暴雨协同|晴空协同|天时地利已激活|天时地利)/g, '<span class="text-emerald-700 font-extrabold animate-pulse font-serif">🌟$1</span>');
+
+                                      // Numbers (like troop losses or gold spent)
+                                      formatted = formatted.replace(/(-\s*\d+|折损\s*\d+|减少\s*\d+|扣除\s*\d+)/g, '<span class="text-red-600 font-extrabold font-mono">$1</span>');
+                                      formatted = formatted.replace(/(\+\s*\d+|增加\s*\d+|获取\s*\d+|纳金\s*\d+)/g, '<span class="text-emerald-600 font-extrabold font-mono">$1</span>');
+
+                                      return <span dangerouslySetInnerHTML={{ __html: formatted }} />;
+                                    })()}
+                                  </p>
                                 </div>
                               );
                             })
@@ -3389,10 +3878,51 @@ export default function App() {
                                 <span className="font-mono text-xs font-black text-amber-800">-{goldSpent}</span>
                               </div>
                               <div className="bg-emerald-500/5 p-1.5 border border-emerald-950/10 text-center">
-                                <div className="text-[8.5px] text-emerald-950 font-bold font-serif mb-0.5">⚔️ 歼灭敌寇</div>
+                                <div className="text-[8.5px] text-emerald-955 font-bold font-serif mb-0.5">⚔️ 歼灭敌寇</div>
                                 <span className="font-mono text-xs font-black text-emerald-700">+{goldGained * 12 + 480}</span>
                               </div>
                             </div>
+
+                            {/* Battle Efficiency Gauge Component */}
+                            {(() => {
+                              const historicalAvgLoss = 1200;
+                              // Calculate efficiency score: standard benchmark 1200 relative to actual losses.
+                              // High efficiency = lower losses.
+                              const efficiencyVal = Math.max(10, Math.min(100, Math.round((historicalAvgLoss / (historicalAvgLoss + troopsLost)) * 100)));
+                              return (
+                                <div className="my-2.5 p-2 bg-white/70 border border-artistic-charcoal/20 font-serif">
+                                  <div className="flex justify-between items-center mb-1 text-[9px] font-bold text-stone-800">
+                                    <span>🎯 战役度防守效度 (Battle Efficiency):</span>
+                                    <span className={`font-mono font-black ${
+                                      efficiencyVal >= 80 ? 'text-emerald-700' : efficiencyVal >= 50 ? 'text-amber-700' : 'text-artistic-crimson'
+                                    }`}>
+                                      {efficiencyVal}% {efficiencyVal >= 80 ? '【善守保境】' : efficiencyVal >= 50 ? '【血战得失】' : '【孤注大损】'}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Visual horizontal score container */}
+                                  <div className="relative w-full h-3.5 bg-stone-200 border border-stone-300 rounded-none overflow-hidden flex items-center">
+                                    {/* Tick indicating historical average standard casualty line (at 50%) */}
+                                    <div className="absolute left-[50%] top-0 bottom-0 w-0.5 bg-[#8d1d1f] z-10" title="三军交兵历史平均损耗阈值基点 (50% 效率)">
+                                      <div className="absolute top-0 transform -translate-x-1/2 -translate-y-[85%] text-[7px] bg-red-800 text-white leading-none px-0.5 scale-90 select-none opacity-90 font-sans">史均</div>
+                                    </div>
+                                    
+                                    {/* Solid bar progress visualizer */}
+                                    <div 
+                                      className={`h-full transition-all duration-500 ease-out ${
+                                        efficiencyVal >= 80 ? 'bg-emerald-600' : efficiencyVal >= 50 ? 'bg-amber-500' : 'bg-artistic-crimson'
+                                      }`}
+                                      style={{ width: `${efficiencyVal}%` }}
+                                    />
+                                  </div>
+
+                                  <div className="mt-1 flex justify-between items-center text-[8px] text-stone-500 leading-none">
+                                    <span>💂 损折: {troopsLost} 兵卒 / 1200均值</span>
+                                    <span>亏溢效比: {Math.round((troopsLost / historicalAvgLoss) * 100)}%</span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
 
                             {/* Decision cost performance evaluation */}
                             {(() => {
@@ -3541,6 +4071,65 @@ export default function App() {
                               </div>
                             )}
                           </div>
+
+                          {/* Automatic weakest region garrison reinforcement panel */}
+                          {playerControlled.length > 0 && (
+                            <div className="mt-3.5 pt-3 border-t border-dashed border-artistic-charcoal/25 font-serif">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  // Find current weakest player territory
+                                  let weakest = playerControlled[0];
+                                  playerControlled.forEach((r) => {
+                                    if (r.garrison < weakest.garrison) {
+                                      weakest = r;
+                                    }
+                                  });
+
+                                  // Calculate gold allocation (25% of current cash balance, max 150 gold)
+                                  const allocation = Math.min(Math.floor(playerStats.gold * 0.25), 150);
+
+                                  if (allocation < 40) {
+                                    alert(`库府金砖空虚！当前25%拨付折算成：${allocation} 黄金。紧急驰援至少需要 40 黄金方可组织补给卒！`);
+                                    return;
+                                  }
+
+                                  sfx.playDrum();
+
+                                  // 1 gold recruits 4 garrisons
+                                  const recruitmentNum = allocation * 4;
+
+                                  // Update weakest region garrison in state
+                                  setRegions(prev => prev.map(r => r.id === weakest.id ? { ...r, garrison: r.garrison + recruitmentNum } : r));
+
+                                  // Deduct gold from global user balance
+                                  setPlayerStats(prev => ({
+                                    ...prev,
+                                    gold: Math.max(0, prev.gold - allocation)
+                                  }));
+
+                                  // Record to battle log database
+                                  const dateStr = `公元${playerStats.year}年${playerStats.month}月${playerStats.day}日`;
+                                  const msg = {
+                                    id: `auto_reinforce_${Date.now()}`,
+                                    chapterId: currentChapterId,
+                                    timestamp: dateStr,
+                                    message: `🏰 【要塞特勤-加盖防线】主公紧急特批 25% 库饷共计 -${allocation} 黄金，金急星驰开往守备最弱要地【${weakest.name}】（守卒原剩: ${weakest.garrison} 人），配发精良校卫 +${recruitmentNum} 精良悍卒，城防备战水准大幅提高！`,
+                                    type: 'gain' as const
+                                  };
+                                  setBattleLogs(prev => [msg, ...prev]);
+                                  showToast(`🏯 【要地补阵】已紧急加盖守军【${weakest.name}】守卒 +${recruitmentNum} 人！`);
+                                }}
+                                className="w-full bg-[#1c1917] hover:bg-emerald-800 text-artistic-bg py-2.5 px-3 rounded-none font-serif font-black text-[11px] uppercase tracking-wider shadow-xs transition-colors duration-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                                title="分析当前我军受控城池中守卒最空乏的郡县，调动25%黄金余额，在当面郡坞募兵防备"
+                              >
+                                <span>🏯 拨帑紧急驰援最弱要隘</span>
+                              </button>
+                              <p className="text-[8.2px] text-stone-500 font-serif leading-normal mt-1.5 text-center">
+                                * 自动定位弱卒据防，提取 25% 黄金（最高 150金）折募补给卒（1金/4兵）星夜驰援支援。
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -3590,6 +4179,7 @@ export default function App() {
                 activeQuests={questsList.filter((q) => q.status === 'AVAILABLE' || q.status === 'ACTIVE').map(q => ({ targetRegionId: q.targetRegionId, title: q.title }))}
                 exploredRegions={exploredRegions}
                 tradeRoutes={tradeRoutes}
+                currentWeather={currentWeather}
               />
             )}
 
@@ -3614,6 +4204,8 @@ export default function App() {
                 onRecruitGeneral={handleRecruitGeneral}
                 onTrainGeneral={handleTrainGeneral}
                 onRetireGeneral={handleRetireGeneral}
+                generalStatuses={generalStatuses}
+                onPayRansom={handlePayRansom}
               />
             )}
 
@@ -3625,6 +4217,7 @@ export default function App() {
                 setActiveStance={setActiveStance}
                 battleFormation={battleFormation}
                 onSetBattleFormation={setBattleFormation}
+                currentWeather={currentWeather}
                 onAddBattleLog={(msg, type) => setBattleLogs(prev => [
                   { 
                     id: 'trn_' + Date.now(), 
@@ -4324,6 +4917,8 @@ export default function App() {
                 </div>
               </div>
             )}
+              </motion.div>
+            </AnimatePresence>
           </div>
 
           {/* Quick Utility floating bar (Save/Load/Reset actions) */}
@@ -4343,7 +4938,12 @@ export default function App() {
               />
               
               <button
-                onClick={saveGame}
+                onClick={() => {
+                  setConfirmBox({
+                    message: "确定要进行【军务编档】吗？这会覆盖浏览器中之前保存的存档记录，将其更新为当前最新的大业进度及角色天赋英华。",
+                    onConfirm: saveGame
+                  });
+                }}
                 className="bg-artistic-bg hover:bg-artistic-cream text-artistic-crimson rounded-none border border-artistic-crimson px-3 py-1 font-bold text-[11px] transition-all flex items-center gap-1 shadow-sm cursor-pointer"
               >
                 <Save className="w-3.5 h-3.5" />
@@ -4843,6 +5443,8 @@ export default function App() {
                     showToast("【古印异变】密印对答有误，阴风吹散了你的军营黄金及名声！");
                   }
                   setShowPasswordModal(false);
+                  sanClickRef.current = 0;
+                  guoClickRef.current = 0;
                   setSanCount(0);
                   setGuoCount(0);
                 }}
@@ -4855,6 +5457,8 @@ export default function App() {
                 onClick={() => {
                   sfx.playClick();
                   setShowPasswordModal(false);
+                  sanClickRef.current = 0;
+                  guoClickRef.current = 0;
                   setSanCount(0);
                   setGuoCount(0);
                 }}
@@ -5263,11 +5867,39 @@ export default function App() {
         </div>
       )}
 
-      {/* Footer credits design pattern */}
-      <footer className="py-4 text-center text-[10.5px] text-artistic-charcoal border-t border-artistic-charcoal/30 font-serif relative shrink-0">
-        <div className="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(#3d3228_1px,transparent_1px)] [background-size:12px_12px]"></div>
-        <p className="tracking-wide">大漢建安歷 · 紙上書春秋三國志 · 逆改乾坤皆在主公一劍</p>
-      </footer>
+       {/* Footer credits design pattern */}
+       <AnimatePresence>
+         {showQuickSaveFlash && (
+           <motion.div
+             initial={{ opacity: 0, scale: 0.9, y: 50 }}
+             animate={{ opacity: 1, scale: 1, y: 0 }}
+             exit={{ opacity: 0, scale: 0.95, y: -20 }}
+             transition={{ duration: 0.3, ease: "easeOut" }}
+             className="fixed bottom-12 right-12 z-[9999] bg-[#1e1c19] text-white border-2 border-[#d4af37] px-6 py-4 flex items-center gap-4 shadow-2xl rounded-none font-serif select-none"
+             style={{ boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6), inset 0 0 15px rgba(212, 175, 55, 0.3)' }}
+           >
+             <div className="w-10 h-10 rounded-full border border-[#d4af37]/60 flex items-center justify-center text-xl bg-[#2a241e] shrink-0 animate-pulse text-[#d4af37]">
+               🗃️
+             </div>
+             <div className="text-left">
+               <h4 className="text-sm font-black tracking-widest text-[#d4af37] mb-0.5">
+                 📁 乾坤奏报 · 手动快速存盘成功
+               </h4>
+               <p className="text-[10px] text-stone-300">
+                 军情行纪与大将本草已妥善封存入阁。天命归拢，万无一失。
+               </p>
+             </div>
+             <div className="text-[10px] bg-[#d4af37] text-[#1e1c19] px-1.5 py-0.5 font-bold scale-90">
+               Ctrl+S 已保存
+             </div>
+           </motion.div>
+         )}
+       </AnimatePresence>
+
+       <footer className="py-4 text-center text-[10.5px] text-artistic-charcoal border-t border-artistic-charcoal/30 font-serif relative shrink-0">
+         <div className="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(#3d3228_1px,transparent_1px)] [background-size:12px_12px]"></div>
+         <p className="tracking-wide">大漢建安歷 · 紙上書春秋三國志 · 逆改乾坤皆在主公一劍</p>
+       </footer>
     </div>
   );
 }

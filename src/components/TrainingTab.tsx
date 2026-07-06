@@ -19,6 +19,7 @@ interface TrainingTabProps {
   showToast: (msg: string) => void;
   playDrum: () => void;
   playClick: () => void;
+  currentWeather?: 'CLEAR' | 'HEAVY_FOG' | 'SUDDEN_RAIN';
 }
 
 export default function TrainingTab({
@@ -31,7 +32,8 @@ export default function TrainingTab({
   onAddBattleLog,
   showToast,
   playDrum,
-  playClick
+  playClick,
+  currentWeather = 'CLEAR'
 }: TrainingTabProps) {
   const [drillLog, setDrillLog] = useState<string[]>([]);
   const [trainingStreak, setTrainingStreak] = useState<number>(0);
@@ -781,12 +783,21 @@ export default function TrainingTab({
             >
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <span className="font-serif font-black text-xs text-stone-900">🛡️ 金甲龟宿阵 (Tortoise)</span>
+                  <span className="font-serif font-black text-xs text-stone-900 font-serif">🛡️ 金甲龟宿阵 (Tortoise)</span>
                   {battleFormation === 'TORTOISE' && <span className="text-[8.5px] bg-emerald-700 text-white px-1.5 py-0.5 font-bold font-serif animate-pulse">当前修习</span>}
                 </div>
                 <p className="text-[10px] text-stone-600 font-serif leading-relaxed mb-1.5">
                   重盾相结，排兵紧锁，灵龟负甲抗乱！极高抵扣飞羽、落石及突袭伏兵等全战场战损伤害。
                 </p>
+                {/* Weather Synergy Info */}
+                <div className={`text-[8.5px] font-serif p-1 mb-1 border ${
+                  currentWeather === 'HEAVY_FOG'
+                    ? 'bg-emerald-100 border-emerald-400 text-emerald-950 font-bold animate-pulse'
+                    : 'bg-stone-50 border-stone-200 text-stone-500'
+                }`}>
+                  🌫️ <b>【大雾协同】</b> 遭遇大雾天时，本阵多得浓雾屏护，额外豁免 25% 兵力折损！
+                  {currentWeather === 'HEAVY_FOG' && <span className="block text-emerald-700 font-extrabold mt-0.5">✨ 天时地利已激活！</span>}
+                </div>
               </div>
               <div className="border-t border-emerald-200/50 pt-1.5 mt-1.5 text-[9.5px] font-mono font-bold text-emerald-800 font-serif">
                 🛡️ 全面战损免折：<span className="text-emerald-700 font-extrabold">-25%</span><br />
@@ -810,12 +821,21 @@ export default function TrainingTab({
             >
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <span className="font-serif font-black text-xs text-stone-900">🔱 重锋刺枪阵 (Phalanx)</span>
+                  <span className="font-serif font-black text-xs text-stone-900 font-serif">🔱 重锋刺枪阵 (Phalanx)</span>
                   {battleFormation === 'PHALANX' && <span className="text-[8.5px] bg-amber-700 text-white px-1.5 py-0.5 font-bold font-serif">当前修习</span>}
                 </div>
                 <p className="text-[10px] text-stone-600 font-serif leading-relaxed mb-1.5">
                   以长枪大阵抵角接刃，锐角突破。枪林如刺，具有最高正向穿刺和战损抗击，但阵翼防御微受限。
                 </p>
+                {/* Weather Synergy Info */}
+                <div className={`text-[8.5px] font-serif p-1 mb-1 border ${
+                  currentWeather === 'SUDDEN_RAIN'
+                    ? 'bg-amber-100 border-amber-400 text-amber-950 font-bold animate-pulse'
+                    : 'bg-stone-50 border-stone-200 text-stone-500'
+                }`}>
+                  🌧️ <b>【暴雨协同】</b> 遭遇暴雨天时，泥泞阻碍敌骑，枪阵两翼格外坚实，额外豁免 20% 兵损！
+                  {currentWeather === 'SUDDEN_RAIN' && <span className="block text-amber-700 font-extrabold mt-0.5">✨ 天时地利已激活！</span>}
+                </div>
               </div>
               <div className="border-t border-amber-200/50 pt-1.5 mt-1.5 text-[9.5px] font-mono font-bold text-amber-800 font-serif">
                 💥 先锋突刺伤害：<span className="text-red-700 font-extrabold">+25%</span><br />
@@ -839,12 +859,21 @@ export default function TrainingTab({
             >
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <span className="font-serif font-black text-xs text-stone-900">🏹 万弩箭墙阵 (Archer Wall)</span>
+                  <span className="font-serif font-black text-xs text-stone-900 font-serif">🏹 万弩箭墙阵 (Archer Wall)</span>
                   {battleFormation === 'ARCHER_WALL' && <span className="text-[8.5px] bg-purple-700 text-white px-1.5 py-0.5 font-bold font-serif animate-pulse">当前修习</span>}
                 </div>
                 <p className="text-[10px] text-stone-600 font-serif leading-relaxed mb-1.5">
                   万强弓满上，以极其密集的覆地强弩箭雨滞留、射退、收割来犯敌骑，远控场均衡完美。
                 </p>
+                {/* Weather Synergy Info */}
+                <div className={`text-[8.5px] font-serif p-1 mb-1 border ${
+                  currentWeather === 'CLEAR'
+                    ? 'bg-purple-100 border-purple-400 text-purple-950 font-bold animate-pulse'
+                    : 'bg-stone-50 border-stone-200 text-stone-500'
+                }`}>
+                  ☀️ <b>【晴空协同】</b> 遭遇晴天天时，视界清晰箭道优异，箭雨幕压制倍增，额外豁免 15% 兵损！
+                  {currentWeather === 'CLEAR' && <span className="block text-purple-700 font-extrabold mt-0.5">✨ 天时地利已激活！</span>}
+                </div>
               </div>
               <div className="border-t border-purple-200/50 pt-1.5 mt-1.5 text-[9.5px] font-mono font-bold text-purple-800 font-serif">
                 🛡️ 箭雨伤害阻击：<span className="text-[10px] text-purple-700 font-extrabold">+15%</span><br />
