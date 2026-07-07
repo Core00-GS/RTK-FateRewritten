@@ -120,7 +120,8 @@ export const INITIAL_REGIONS: Region[] = [
     development: 20,
     garrison: 8000,
     revenue: 150,
-    connected: ['beihai', 'yecheng']
+    connected: ['beihai', 'yecheng'],
+    terrain: 'PLAIN'
   },
   {
     id: 'beihai',
@@ -132,7 +133,8 @@ export const INITIAL_REGIONS: Region[] = [
     development: 30,
     garrison: 5000,
     revenue: 250,
-    connected: ['zhuojun', 'yecheng', 'jianye']
+    connected: ['zhuojun', 'yecheng', 'jianye'],
+    terrain: 'PLAIN'
   },
   {
     id: 'yecheng',
@@ -144,7 +146,8 @@ export const INITIAL_REGIONS: Region[] = [
     development: 45,
     garrison: 12000,
     revenue: 400,
-    connected: ['zhuojun', 'beihai', 'luoyang']
+    connected: ['zhuojun', 'beihai', 'luoyang'],
+    terrain: 'PLAIN'
   },
   {
     id: 'luoyang',
@@ -156,7 +159,8 @@ export const INITIAL_REGIONS: Region[] = [
     development: 80,
     garrison: 20000,
     revenue: 600,
-    connected: ['yecheng', 'changan', 'xiangyang']
+    connected: ['yecheng', 'changan', 'xiangyang'],
+    terrain: 'MOUNTAIN'
   },
   {
     id: 'changan',
@@ -168,7 +172,8 @@ export const INITIAL_REGIONS: Region[] = [
     development: 60,
     garrison: 18000,
     revenue: 450,
-    connected: ['luoyang', 'chengdu', 'xiongnu']
+    connected: ['luoyang', 'chengdu', 'xiongnu'],
+    terrain: 'MOUNTAIN'
   },
   {
     id: 'xiongnu',
@@ -180,7 +185,8 @@ export const INITIAL_REGIONS: Region[] = [
     development: 10,
     garrison: 15000,
     revenue: 80,
-    connected: ['changan', 'yecheng']
+    connected: ['changan', 'yecheng'],
+    terrain: 'DESERT'
   },
   {
     id: 'chengdu',
@@ -192,7 +198,8 @@ export const INITIAL_REGIONS: Region[] = [
     development: 65,
     garrison: 10000,
     revenue: 500,
-    connected: ['changan', 'xiangyang']
+    connected: ['changan', 'xiangyang'],
+    terrain: 'MOUNTAIN'
   },
   {
     id: 'xiangyang',
@@ -204,7 +211,8 @@ export const INITIAL_REGIONS: Region[] = [
     development: 50,
     garrison: 11000,
     revenue: 350,
-    connected: ['luoyang', 'chengdu', 'jianye']
+    connected: ['luoyang', 'chengdu', 'jianye'],
+    terrain: 'RIVER'
   },
   {
     id: 'jianye',
@@ -216,6 +224,7 @@ export const INITIAL_REGIONS: Region[] = [
     development: 40,
     garrison: 8000,
     revenue: 300,
-    connected: ['beihai', 'xiangyang']
+    connected: ['beihai', 'xiangyang'],
+    terrain: 'RIVER'
   }
 ];

@@ -833,7 +833,20 @@ export default function GeneralRoster({
                             <span className="truncate">{g.name.split(' ')[0]}</span>
                             <span className="shrink-0 text-[8px] bg-amber-100 border border-amber-400 text-amber-900 px-1 font-bold rounded-none scale-90">LV.{g.level}</span>
                           </div>
-                          <div className="text-[9px] text-artistic-charcoal/75 font-serif flex items-center justify-between gap-1 mt-0.5">
+                          {/* Leveling Progress Bar and stats */}
+                          <div className="mt-1 w-full">
+                            <div className="flex justify-between items-center text-[7.5px] text-stone-500 font-mono leading-none mb-0.5 select-none">
+                              <span>历练:{g.trainingCount || 0} 战役:{g.battleCount || 0}</span>
+                              <span>{g.exp || 0}%</span>
+                            </div>
+                            <div className="w-full h-1 bg-stone-200/80 border border-stone-300/40 rounded-none overflow-hidden select-none">
+                              <div 
+                                className="h-full bg-amber-500 transition-all duration-500" 
+                                style={{ width: `${g.exp || 0}%` }}
+                              />
+                            </div>
+                          </div>
+                          <div className="text-[9px] text-artistic-charcoal/75 font-serif flex items-center justify-between gap-1 mt-1">
                             <span className="truncate text-[8.5px] opacity-75">等阶: 偏将</span>
                             {(() => {
                               if (isCaptured) return <span className="shrink-0 text-[8px] px-1 py-0.2 bg-stone-700 text-stone-100 font-serif font-bold">⛓️ 槛车被俘</span>;
@@ -917,7 +930,20 @@ export default function GeneralRoster({
                           <span className="truncate">{g.name.split(' ')[0]}</span>
                           <span className="shrink-0 text-[8px] bg-amber-100 border border-amber-400 text-amber-900 px-1 font-bold rounded-none scale-90">LV.{g.level}</span>
                         </div>
-                        <div className="text-[9.5px] text-artistic-crimson font-serif font-black flex items-center justify-between mt-0.5">
+                        {/* Leveling Progress Bar and stats */}
+                        <div className="mt-1 w-full">
+                          <div className="flex justify-between items-center text-[7.5px] text-stone-500 font-mono leading-none mb-0.5 select-none">
+                            <span>历练:{g.trainingCount || 0} 战役:{g.battleCount || 0}</span>
+                            <span>{g.exp || 0}%</span>
+                          </div>
+                          <div className="w-full h-1 bg-stone-200/80 border border-stone-300/40 rounded-none overflow-hidden select-none">
+                            <div 
+                              className="h-full bg-amber-500 transition-all duration-500" 
+                              style={{ width: `${g.exp || 0}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="text-[9.5px] text-artistic-crimson font-serif font-black flex items-center justify-between mt-1">
                           <span>🌾 黄金 {g.recruitCost}</span>
                           {(() => {
                             if (g.force >= 90) return <span className="shrink-0 text-[8px] px-1 py-0.2 bg-[#5c0f11] text-red-100 font-serif font-bold shadow-xs scale-90">🔥 神将</span>;

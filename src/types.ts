@@ -50,6 +50,8 @@ export interface General {
   biography: string;    // 传记
   status: 'GARRISON' | 'GUARD' | 'FREE'; // 状态
   recruitCost: number;  // 招募需要消耗的钱粮/声望
+  trainingCount?: number; // 历练督训次数
+  battleCount?: number;   // 浴血沙场战役次数
 }
 
 // 地区/据点信息
@@ -64,6 +66,7 @@ export interface Region {
   garrison: number;     // 驻守兵力
   revenue: number;      // 每回合钱粮产出
   connected: string[];  // 连接的其他城市 ID
+  terrain?: 'MOUNTAIN' | 'PLAIN' | 'RIVER' | 'DESERT'; // 地理地形
 }
 
 // 剧情选项的效果定义

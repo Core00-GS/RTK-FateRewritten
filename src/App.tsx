@@ -28,7 +28,8 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { 
   Skull, Sparkles, BookOpen, Map, Landmark, Users, 
   HelpCircle, Archive, RotateCcw, Save, ShieldCheck, 
-  Trash2, Award, ShieldAlert, Swords, Quote, Calendar, Coins, Volume2, VolumeX, AlertCircle, Info, X
+  Trash2, Award, ShieldAlert, Swords, Quote, Calendar, Coins, Volume2, VolumeX, AlertCircle, Info, X,
+  Sun, CloudFog, CloudRain
 } from 'lucide-react';
 
 const SAVE_KEY = 'three_kingdoms_retro_alt_save_v2';
@@ -1822,6 +1823,25 @@ export default function App() {
             showToast(`🏹 【锋矢阵·冲攻多折】锋线过于突出暴露，乱军搏杀中额外增加 15% 精卒兵员折损 (多折损了 ${extraLoss} 精锐)！`);
           }
 
+          // Apply Terrain Modifiers!
+          const currentRegion = regions.find(r => r.id === playerLocation);
+          const terrainType = currentRegion?.terrain || 'PLAIN';
+          if (terrainType === 'MOUNTAIN') {
+            const savedByTerrain = Math.round(Math.abs(change) * 0.10);
+            change = change + savedByTerrain;
+            showToast(`⛰️ 【地域·山地天险】：背靠险峰，凭借 10% 山地防御加成，免除了 ${savedByTerrain} 员士卒折损！`);
+          } else if (terrainType === 'RIVER') {
+            const savedByTerrain = Math.round(Math.abs(change) * 0.15);
+            change = change + savedByTerrain;
+            showToast(`🌊 【地域·大江天堑】：凭江拒守，凭借 15% 江河防御加成，免除了 ${savedByTerrain} 员士卒折损！`);
+          } else if (terrainType === 'DESERT') {
+            const extraLossByTerrain = Math.round(Math.abs(change) * 0.10);
+            change = change - extraLossByTerrain;
+            showToast(`🏜️ 【地域·塞外荒漠】：无遮无拦、狂沙肆虐，沙漠环境导致额外折损了 ${extraLossByTerrain} 员士卒！`);
+          } else if (terrainType === 'PLAIN') {
+            showToast(`🌾 【地域·平原旷野】：正面搏杀，地势开阔无特定加成。`);
+          }
+
           // Apply weather-formation synergy bonus!
           let weatherSynergyBonus = 0;
           let weatherSynergyMsg = '';
@@ -2071,6 +2091,49 @@ export default function App() {
           isWin ? 'VICTORY' : 'DEFEAT',
           lost
         );
+
+        // Record terrain modifier to the battle logs
+        const currentRegion = regions.find(r => r.id === playerLocation);
+        const terrainType = currentRegion?.terrain || 'PLAIN';
+        let terrainLogMsg = '';
+        if (terrainType === 'MOUNTAIN') {
+          terrainLogMsg = `⛰️ 【天险阻击】战事在【${currentRegion?.name || '山地'}】打响。我军据险固守，享有山地防御力大增 +10% 优势，敌军仰攻折戟。`;
+        } else if (terrainType === 'RIVER') {
+          terrainLogMsg = `🌊 【凭河据守】战事在【${currentRegion?.name || '水泽'}】打响。我军凭江结营，江河天堑赋予 +15% 防御优势，封锁敌军渡口。`;
+        } else if (terrainType === 'DESERT') {
+          terrainLogMsg = `🏜️ 【风沙暴露】战事在【${currentRegion?.name || '塞外荒漠'}】打响。此处风沙狂暴、无险可托，沙漠恶劣气候导致防御不济扣减 -10%！`;
+        } else {
+          terrainLogMsg = `🌾 【平野接战】战事在【${currentRegion?.name || '平原'}】打响。一马平川、交锋猛烈，地势无特定攻防修正，正面交锋！`;
+        }
+
+        const terrainLogEntry = {
+          id: 'terrain_log_' + Date.now(),
+          chapterId: currentChapterId,
+          timestamp: `公元${finalStats.year}年${finalStats.month}月${finalStats.day}日`,
+          message: terrainLogMsg,
+          type: 'action' as const
+        };
+        setBattleLogs(prev => [terrainLogEntry, ...prev]);
+
+        // Increment battleCount and experience for all recruited generals
+        recruitedGenerals.forEach(genId => {
+          const gen = INITIAL_GENERAL_POOL[genId];
+          if (gen) {
+            gen.battleCount = (gen.battleCount || 0) + 1;
+            const currentExp = gen.exp || 0;
+            const expGained = isWin ? 35 : 15;
+            const nextExp = currentExp + expGained;
+            if (nextExp >= 100) {
+              gen.level += 1;
+              gen.exp = nextExp % 100;
+              gen.force = Math.min(100, gen.force + 1);
+              gen.intelligence = Math.min(100, gen.intelligence + 1);
+              gen.leadership = Math.min(100, gen.leadership + 1);
+            } else {
+              gen.exp = nextExp;
+            }
+          }
+        });
 
         // General wounding/capturing probability check
         if (recruitedGenerals.length > 0) {
@@ -2322,7 +2385,9 @@ export default function App() {
 
     const gen = INITIAL_GENERAL_POOL[generalId];
     if (gen) {
+      gen.trainingCount = (gen.trainingCount || 0) + 1;
       gen.level += 1;
+      gen.exp = 0; // Training triggers instant level up, so reset exp to 0
       (gen as any)[statGained] = Math.min(100, (gen as any)[statGained] + amount);
       gen.loyalty = Math.min(100, gen.loyalty + 5);
     }
@@ -3093,7 +3158,7 @@ export default function App() {
         <div id="active-game-board" className="w-full flex-1 flex flex-col justify-between space-y-5 z-10">
           
           {/* Main callout HUD bar */}
-          <div className="bg-artistic-cream border-2 border-artistic-charcoal p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 items-center shadow-sm">
+          <div className="bg-artistic-cream border-2 border-artistic-charcoal p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-center shadow-sm">
             {/* Identity node */}
             <div 
               onClick={() => setShowPlayerModal(true)}
@@ -3134,6 +3199,35 @@ export default function App() {
               <div className="font-serif text-[10.5px] text-artistic-charcoal/80 uppercase">中兴声威威名：</div>
               <div className="font-serif font-extrabold text-artistic-ink text-sm flex items-center gap-1 mt-0.5">
                 👑 声誉: {playerStats.prestige}
+              </div>
+            </div>
+
+            {/* Weather node */}
+            <div className="border-r border-artistic-charcoal/25 pr-2">
+              <div className="font-serif text-[10.5px] text-artistic-charcoal/80 uppercase mb-0.5">当前天下天时：</div>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="relative flex items-center justify-center w-8 h-8 rounded-none border border-artistic-charcoal/30 bg-[#ebdcb9] overflow-hidden shrink-0 select-none">
+                  {(() => {
+                    if (currentWeather === 'CLEAR') {
+                      return <Sun className="w-5 h-5 text-amber-600 animate-spin" style={{ animationDuration: '10s' }} />;
+                    }
+                    if (currentWeather === 'HEAVY_FOG') {
+                      return <CloudFog className="w-5 h-5 text-slate-500 animate-pulse" />;
+                    }
+                    if (currentWeather === 'SUDDEN_RAIN') {
+                      return <CloudRain className="w-5 h-5 text-sky-700 animate-bounce" style={{ animationDuration: '2s' }} />;
+                    }
+                    return null;
+                  })()}
+                </div>
+                <div className="truncate">
+                  <div className="font-serif font-black text-xs text-artistic-charcoal flex items-center gap-0.5 truncate">
+                    {WEATHER_DETAILS[currentWeather].name}
+                  </div>
+                  <div className="text-[8px] text-stone-500 font-serif leading-tight truncate">
+                    {currentWeather === 'CLEAR' ? '视界大好' : currentWeather === 'HEAVY_FOG' ? '行军延期' : '道路泥泞'}
+                  </div>
+                </div>
               </div>
             </div>
 

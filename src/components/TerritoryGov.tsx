@@ -9,6 +9,96 @@ import { FACTIONS } from '../data/regions';
 import { Coins, UserPlus, Sprout, Landmark, Gift, Heart, Scale, ShieldAlert, Sun, CloudRain, Snowflake, Bug } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 
+interface Petition {
+  id: string;
+  petitioner: string;
+  avatar: string;
+  title: string;
+  narrative: string;
+  cost: number;
+  gainVirtue: number;
+  gainPrestige: number;
+  gainTroops?: number;
+  acceptedLog: string;
+  declinedLog: string;
+}
+
+const PETITIONS_POOL: Petition[] = [
+  {
+    id: 'p1',
+    petitioner: '老丈 纪高',
+    avatar: '👴',
+    title: '寒村饥荒 · 乞免税租',
+    narrative: '涿郡南关暴雨导致麦地半死，寒冬将至，数百村民冬无御衣、口无余粮。村民推选老丈纪高前来叩关求见，含泪请愿豁免本期十税一之赋税，并拨发一笔急用麦粟度冬。',
+    cost: 120,
+    gainVirtue: 3,
+    gainPrestige: 25,
+    acceptedLog: '主公宅心仁厚！您下旨蠲免了涿郡等地的秋租，并当堂发放 120 黄金急赈，老汉跪哭叩首，口称“明主出世，玄德再来”！您的德行、声望大涨！',
+    declinedLog: '主公婉言谢绝，言及行军打仗、军械急迫，国库亦不能开此先例。老丈连声叹息，佝偻着身躯退下了。'
+  },
+  {
+    id: 'p2',
+    petitioner: '方丈 慧通',
+    avatar: '🧘',
+    title: '名山古刹 · 佛堂倾圮',
+    narrative: '常山深处古松名寺遭夏洪泥石冲刷，大雄宝殿山门倾覆，金身半露雨中。方丈慧通大师长途跋涉前来乞请府库拨赏松木、雇请泥水匠人重修寺院，以此清涤暴戾、护民安康。',
+    cost: 150,
+    gainVirtue: 2,
+    gainPrestige: 35,
+    acceptedLog: '主公佛心昭然！特拨 150 黄金召工重修佛堂金身。寺成之日，万民云集朝拜，皆传颂主公崇文礼佛之功。您的德行及势力威名皆有所成！',
+    declinedLog: '主公叹曰：“今天下涂炭，千万百姓易子而食，泥塑木雕之菩萨岂能急救？”方丈合十叹息，唱念佛号离去。'
+  },
+  {
+    id: 'p3',
+    petitioner: '士子 荀华',
+    avatar: '🎒',
+    title: '寒门秀才 · 赶考资粮',
+    narrative: '一自称颍川名士之后的青年荀华跪陈，其人一贫如洗但胸罗万卷，奈何京师道远，盘缠遭劫。其人求见乞请主公资助买马、雇车与路盘，并誓言一旦及第必图厚报。',
+    cost: 100,
+    gainVirtue: 2,
+    gainPrestige: 20,
+    acceptedLog: '主公不拘一格纳英贤！特赠 100 黄金并赐快马一匹。荀华喜极而泣，立誓学成必为幕府效犬马之劳！德行增加，威名远扬！',
+    declinedLog: '主公见其言辞浮夸，真假难辨，命衙役赠与其糙米一斗，打发离去。'
+  },
+  {
+    id: 'p4',
+    petitioner: '医者 董奉',
+    avatar: '🩹',
+    title: '热疫流行 · 求散青黛',
+    narrative: '城内因暴雨引发热症，大批穷苦民户高烧咳血，无钱就诊。杏林医者董奉前来陈情，自言已有对症灵方，唯官库垄断了青黛、黄芩等急需草药，乞请主公特恩开放药库，普济万民。',
+    cost: 130,
+    gainVirtue: 3,
+    gainPrestige: 30,
+    acceptedLog: '主公大慈大悲！不仅开拔药库，更垫付 130 黄金用于煎药施诊。几日后疫病顿消，阖城百姓家家悬挂主公长生牌位！德行大长！',
+    declinedLog: '主公言草药为军用战备物资，关乎士卒生命，不敢轻率开仓，命其另寻他法。董奉扼腕长叹。'
+  },
+  {
+    id: 'p5',
+    petitioner: '会长 陆富贵',
+    avatar: '🐫',
+    title: '江防渡桥 · 冲毁再兴',
+    narrative: '秋汛大潮冲垮了沟通边疆郡县的要道大木桥，导致通商马帮、运粮车队尽皆瘫痪。本郡商会陆富贵求见，望府衙能牵头出资 200 黄金招募石匠改建稳固石桥，以通商路。',
+    cost: 200,
+    gainVirtue: 2,
+    gainPrestige: 50,
+    acceptedLog: '主公通商惠工！拔 200 黄金督造磐石拱桥，桥成之日车水马龙，各地商帮无不盛赞主公气吞山河、德润民生。声誉暴增，德行提高！',
+    declinedLog: '主公叹言大战在即，库金需要用来筹办铁骑箭矢，木桥倾圮可暂用竹排渡江，陆会长抱拳叹息告退。'
+  },
+  {
+    id: 'p6',
+    petitioner: '遗孀 柳氏',
+    avatar: '👩',
+    title: '阵亡士卒 · 遗孤请恤',
+    narrative: '前番抵御流寇暴匪中不幸殉国阵亡的一位柳校尉之孀妇柳氏，今日带着三名嗷嗷待哺的幼童长跪官衙外，哭诉军中抚恤被贪墨克扣，孤儿寡母生计维艰、无衣过冬。',
+    cost: 80,
+    gainVirtue: 2,
+    gainPrestige: 20,
+    gainTroops: 150,
+    acceptedLog: '主公抚按遗烈，大恸之下，当众责罚了贪墨小吏，特赐 80 黄金厚恤柳氏，并亲手抱其遗孤、安置其军屯营。三军士卒见者无不痛哭流涕，战意大长，额外感召 150 名豪杰归队效命！',
+    declinedLog: '主公命军营查验档案，按例差拨糙米二担抚慰。柳氏含泪谢恩离去。'
+  }
+];
+
 interface TerritoryGovProps {
   playerStats: PlayerStats;
   regions: Region[];
@@ -42,6 +132,9 @@ export default function TerritoryGov({
   const [selectedRegionId, setSelectedRegionId] = useState<string>(
     regions.find((r) => r.faction === 'PLAYER')?.id || regions[0].id
   );
+
+  const [currentPetitionIndex, setCurrentPetitionIndex] = useState<number>(0);
+  const [petitionOutcome, setPetitionOutcome] = useState<{ accepted: boolean; log: string } | null>(null);
 
   const playerControlledRegions = regions.filter((r) => r.faction === 'PLAYER');
 
@@ -771,6 +864,121 @@ export default function TerritoryGov({
               </div>
             </div>
           )}
+        </div>
+
+        {/* Court Petitions Feature Block */}
+        <div id="court-petitions-section" className={`mt-6 border-t ${seasonThemeBorder} pt-4`}>
+          <div className="flex justify-between items-center mb-2">
+            <h4 className={`font-serif font-black text-sm flex gap-1.5 items-center ${seasonTitleColor}`}>
+              <Scale className="w-4.5 h-4.5 text-artistic-crimson animate-pulse" />
+              📜 朝廷陈情与民间请愿 (Folk Petitions & Court Pleadings)
+            </h4>
+            <span className="text-[9px] bg-artistic-crimson text-artistic-bg px-1.5 py-0.5 font-mono rounded-none scale-95 select-none animate-pulse">
+              ★ 广纳贤德 ★
+            </span>
+          </div>
+          <p className={`text-[11px] mb-3 font-serif ${seasonTextColor}`}>
+            神州动荡，各郡县名宿、寒门儒生与战死士卒遗孤，常有陈情表奏。主公可拨付黄金开仓抚民，极大增加您的 <b>德行 (Virtue)</b> 与 <b>声望 (Prestige)</b>！
+          </p>
+
+          {(() => {
+            const petition = PETITIONS_POOL[currentPetitionIndex];
+            if (!petition) return null;
+
+            return (
+              <div className="border border-stone-300 bg-[#ebd9bc]/60 p-4 relative overflow-hidden shadow-xs text-left">
+                {/* Decorative parchment background texture */}
+                <div className="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(#3d3228_1.5px,transparent_1.5px)] [background-size:12px_12px]"></div>
+
+                {petitionOutcome ? (
+                  <div className="animate-fade-in text-center py-2">
+                    <div className="text-2xl mb-1.5">
+                      {petitionOutcome.accepted ? '🟢 广行仁义' : '🔴 婉言回绝'}
+                    </div>
+                    <p className="text-xs text-stone-800 font-serif leading-relaxed italic border-b border-dashed border-stone-300 pb-3 mb-3.5 px-2">
+                      “ {petitionOutcome.log} ”
+                    </p>
+                    <button
+                      onClick={() => {
+                        // Roll another petition randomly, different from current
+                        let nextIdx = currentPetitionIndex;
+                        while (nextIdx === currentPetitionIndex) {
+                          nextIdx = Math.floor(Math.random() * PETITIONS_POOL.length);
+                        }
+                        setCurrentPetitionIndex(nextIdx);
+                        setPetitionOutcome(null);
+                      }}
+                      className="px-3.5 py-1.5 bg-stone-900 hover:bg-stone-800 text-stone-100 border border-stone-700 text-xs font-serif font-bold cursor-pointer transition-all"
+                    >
+                      🗣️ 传下一位陈情使者入殿
+                    </button>
+                  </div>
+                ) : (
+                  <div className="animate-fade-in">
+                    <div className="flex justify-between items-center border-b border-stone-300 pb-2 mb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl shrink-0 bg-white/50 border border-stone-350 p-1 select-none">
+                          {petition.avatar}
+                        </span>
+                        <div>
+                          <div className="text-[10px] text-stone-500 font-mono font-bold leading-none">请愿呈表人: {petition.petitioner}</div>
+                          <h5 className="text-xs font-serif font-black text-stone-900 mt-1">{petition.title}</h5>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-red-900 font-serif font-bold bg-red-100 border border-red-200 px-1.5 py-0.5">
+                          🌾 需黄金: {petition.cost} 两
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-stone-850 font-serif leading-relaxed italic bg-white/40 p-2.5 border border-dashed border-stone-300/60 mb-3.5">
+                      “ {petition.narrative} ”
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <button
+                        onClick={() => {
+                          if (playerStats.gold < petition.cost) {
+                            alert("主公库府库粮不足，无法拨付此项救灾黄金！");
+                            return;
+                          }
+                          // Apply effects
+                          if (onUpdatePlayerStats) {
+                            onUpdatePlayerStats(prev => ({
+                              ...prev,
+                              gold: prev.gold - petition.cost,
+                              virtue: prev.virtue + petition.gainVirtue,
+                              prestige: prev.prestige + petition.gainPrestige,
+                              troops: petition.gainTroops ? prev.troops + petition.gainTroops : prev.troops
+                            }));
+                          }
+                          setPetitionOutcome({ accepted: true, log: petition.acceptedLog });
+                        }}
+                        className="py-2 px-3 bg-emerald-800 hover:bg-emerald-900 text-white border border-emerald-900 text-xs font-serif font-bold transition-all cursor-pointer flex flex-col items-center justify-center shadow-xs"
+                      >
+                        <span className="font-extrabold text-xs">🟢 应允呈表，广施仁德</span>
+                        <span className="text-[9px] opacity-90 font-mono mt-0.5">
+                          (扣黄金 {petition.cost} | 德行 +{petition.gainVirtue} | 威望 +{petition.gainPrestige}
+                          {petition.gainTroops ? ` | 卒 +${petition.gainTroops}` : ''})
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setPetitionOutcome({ accepted: false, log: petition.declinedLog });
+                        }}
+                        className="py-2 px-3 bg-stone-150 hover:bg-stone-200 text-stone-800 border border-stone-300 text-xs font-serif font-bold transition-all cursor-pointer flex flex-col items-center justify-center"
+                      >
+                        <span className="font-extrabold text-xs">🔴 婉言回退，财赋维艰</span>
+                        <span className="text-[9px] text-stone-500 font-mono mt-0.5">(库银宝贵，暂不予解囊)</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
