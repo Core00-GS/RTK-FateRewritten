@@ -219,6 +219,283 @@ export default function RandomEventsTab({
           }
         }
       ]
+    },
+    {
+      id: 'beauty_guan_yinping',
+      title: '🌸 关氏娇女：校场巾帼英姿',
+      description: '关羽之女关银屏手执三十余斤的重铁大刀在校场练习刀法，呼呼生风，汗珠打湿了额前的碎发。主公远远观瞧，她见你来，娇喝一声向你讨教：',
+      options: [
+        {
+          text: '【切磋武艺】展现勇冠万夫的真武力（考验：武力门槛 75）',
+          action: (current: PlayerStats) => {
+            if (current.force >= 75) {
+              const updated = {
+                ...current,
+                troops: Math.min(50000, current.troops + 200),
+                force: current.force + 3
+              };
+              return {
+                updatedStats: updated,
+                logMessage: `⚔️ 【红颜-关银屏】主公以霸王卸甲之势格开其沉重大刀，关银屏美目闪动，惊呼叹服！全军振奋，折服关姬，并得其督训新卒 +200，武力 +3。`
+              };
+            } else {
+              const updated = {
+                ...current,
+                troops: Math.max(100, current.troops - 100),
+                prestige: Math.max(0, current.prestige - 10)
+              };
+              return {
+                updatedStats: updated,
+                logMessage: `💀 【红颜-关银屏】主公大意之下，被关银屏一招「青龙献爪」震落兵刃，闹得校场将佐大笑，主公脸上无光，损兵 -100，威名 -10。`
+              };
+            }
+          }
+        },
+        {
+          text: '【切磋兵理】教导闺中兵书韬略（考验：智力门槛 70）',
+          action: (current: PlayerStats) => {
+            if (current.intelligence >= 70) {
+              const updated = {
+                ...current,
+                intelligence: current.intelligence + 4
+              };
+              return {
+                updatedStats: updated,
+                logMessage: `✨ 【红颜-关银屏】主公深入浅出剖析《春秋》与「围魏救赵」之计，关银屏恍然大悟，对主公博学极其尊崇，主公智力 +4。`
+              };
+            } else {
+              const updated = {
+                ...current,
+                virtue: Math.min(100, current.virtue + 5)
+              };
+              return {
+                updatedStats: updated,
+                logMessage: `🌸 【红颜-关银屏】主公背诵兵书时略有卡顿，关银屏偷笑。但见主公诚恳，倒也觉得亲近。主公德行 +5。`
+              };
+            }
+          }
+        }
+      ]
+    },
+    {
+      id: 'beauty_guan_jinfeng',
+      title: '🌹 关门虎女：名声震烈请缨',
+      description: '关羽长女关金凤（又名关凤）一身金红锁子甲，手按青泥长剑，主动入账请缨，渴望率一旅偏师突击黄巾寇大营。',
+      options: [
+        {
+          text: '【授以牙门将军】拨发 150 精兵壮其军势（需消耗 150 兵力）',
+          action: (current: PlayerStats) => {
+            if (current.troops < 150) {
+              return {
+                updatedStats: current,
+                logMessage: `⚠️ 【红颜-关金凤】大军当前兵力不足 150 亲兵，关凤不忍抽调伤了主公根本，微带失望辞出。`
+              };
+            }
+            const updated = {
+              ...current,
+              troops: current.troops - 150,
+              prestige: current.prestige + 15,
+              popularity: current.popularity + 15
+            };
+            return {
+              updatedStats: updated,
+              logMessage: `🌹 【红颜-关金凤】主公当即授以牙门令，拨予 150 精兵。关凤感激万分，立誓为主公分忧，主公威名 +15，地方民心（民声）+15。`
+            };
+          }
+        },
+        {
+          text: '【亲自辅佐】亲自指点边防守备要务（考验：统帅门槛 72）',
+          action: (current: PlayerStats) => {
+            if (current.leadership >= 72) {
+              const updated = {
+                ...current,
+                leadership: current.leadership + 3,
+                troops: Math.min(50000, current.troops + 120)
+              };
+              return {
+                updatedStats: updated,
+                logMessage: `🛡️ 【红颜-关金凤】主公亲自展开行军图，沙盘推演边防，关凤受益匪浅。吸引幽燕义士闻风来投，精卒 +120，主公统帅 +3。`
+              };
+            } else {
+              const updated = {
+                ...current,
+                gold: Math.max(0, current.gold - 50)
+              };
+              return {
+                updatedStats: updated,
+                logMessage: `⚠️ 【红颜-关金凤】主公大意讲解，漏了破绽。好在花费 50 黄金采购精美甲胄安抚其自尊心，金钱 -50。`
+              };
+            }
+          }
+        }
+      ]
+    },
+    {
+      id: 'beauty_da_qiao',
+      title: '🍂 江东二乔：琴瑟和鸣避乱',
+      description: '扬州一带烽烟骤起，大乔流落至北方幽州寄寓，其在水榭抚琴，曲调清越哀婉，见主公微服经过，她敛衽为礼，叹息乱世红颜之命。',
+      options: [
+        {
+          text: '【拨发岁赋安置】慷慨赠予 100 黄金并在涿县定居（消耗：100 黄金）',
+          action: (current: PlayerStats) => {
+            if (current.gold < 100) {
+              const updated = {
+                ...current,
+                intelligence: current.intelligence + 5
+              };
+              return {
+                updatedStats: updated,
+                logMessage: `🍂 【红颜-大乔】主公羞涩无金，只得陪坐闲谈，与其分析江南天下大势。谈吐得体，智力 +5。`
+              };
+            }
+            const updated = {
+              ...current,
+              gold: current.gold - 100,
+              virtue: Math.min(100, current.virtue + 18),
+              popularity: current.popularity + 20
+            };
+            return {
+              updatedStats: updated,
+              logMessage: `🪙 【红颜-大乔】主公大度拨款 100 黄金安置流离红颜。大乔感激大德，大名满于涿郡！德行 +18，地方民声 +20。`
+            };
+          }
+        },
+        {
+          text: '【吟诗唱和】以古乐府清词唱和琴声（考验：德行门槛 70）',
+          action: (current: PlayerStats) => {
+            if (current.virtue >= 70) {
+              const updated = {
+                ...current,
+                virtue: Math.min(100, current.virtue + 5),
+                prestige: current.prestige + 12
+              };
+              return {
+                updatedStats: updated,
+                logMessage: `🎵 【红颜-大乔】主公出口成章，词意高洁，大乔惊叹主公乃儒雅仁君，引为红颜知己，德行 +5，威名 +12。`
+              };
+            } else {
+              const updated = {
+                ...current,
+                virtue: Math.max(0, current.virtue - 5)
+              };
+              return {
+                updatedStats: updated,
+                logMessage: `⚠️ 【红颜-大乔】词藻略显粗鄙生硬，大乔只得尴尬附和，场面有些冷清。德行 -5。`
+              };
+            }
+          }
+        }
+      ]
+    },
+    {
+      id: 'beauty_xiao_qiao',
+      title: '🎐 绝代风华：桃源酒坊弄霓',
+      description: '江东小乔性情天真烂漫，喜爱品茶斗酒。她在涿县桃源酒家设下一樽桃花佳酿，扬言涿郡豪杰虽多，若无惊天政治眼光者，不配饮此杯。',
+      options: [
+        {
+          text: '【共饮论政】高瞻远瞩畅谈汉室天下（考验：政治门槛 70）',
+          action: (current: PlayerStats) => {
+            if (current.politics >= 70) {
+              const updated = {
+                ...current,
+                politics: current.politics + 3,
+                gold: current.gold + 150
+              };
+              return {
+                updatedStats: updated,
+                logMessage: `🎐 【红颜-小乔】主公痛饮桃花酿，剖析天下群雄割据与废史立牧之得失，小乔钦佩莫名，借用人脉暗中送来辎重支援，政治 +3，库银暴增 +150 黄金！`
+              };
+            } else {
+              const updated = {
+                ...current,
+                gold: Math.max(0, current.gold - 30)
+              };
+              return {
+                updatedStats: updated,
+                logMessage: `🍷 【红颜-小乔】政治论述庸碌无奇，小乔微笑着敬了罚酒。主公大醉，买单耗去 30 黄金。`
+              };
+            }
+          }
+        },
+        {
+          text: '【买单赠宝】豪爽买下名贵佳酿赠予诸将（消耗：60 黄金）',
+          action: (current: PlayerStats) => {
+            if (current.gold < 60) {
+              return {
+                updatedStats: current,
+                logMessage: `⚠️ 【红颜-小乔】主公摸遍身上，竟不足 60 黄金。小乔掩嘴嬉笑，气氛稍有尴尬。`
+              };
+            }
+            const updated = {
+              ...current,
+              gold: current.gold - 60,
+              prestige: current.prestige + 10
+            };
+            return {
+              updatedStats: updated,
+              logMessage: `🪙 【红颜-小乔】主公长笑买单，豪迈将名酝分赐诸将。豪爽重义之名远播，主公声誉 +10。`
+            };
+          }
+        }
+      ]
+    },
+    {
+      id: 'beauty_diao_chan',
+      title: '🌙 连环绝唱：月下焚香祈天',
+      description: '月色如银，风卷桂香。司徒府貂蝉在月下亭中焚香，神情凄婉，默默为天下黎民祈福。她见到主公龙行虎步而来，敛容问道：“天下滔滔，不知主公之志在兴复汉室，还是割据裂土？”',
+      options: [
+        {
+          text: '【弘图汉志】誓除暴乱，中兴大汉（考验：德行门槛 75）',
+          action: (current: PlayerStats) => {
+            if (current.virtue >= 75) {
+              const updated = {
+                ...current,
+                virtue: Math.min(100, current.virtue + 20),
+                prestige: current.prestige + 25
+              };
+              return {
+                updatedStats: updated,
+                logMessage: `🌙 【红颜-貂蝉】主公慷慨陈词，眼含悲戚。貂蝉深受感动，拜谢主公乃天下仁德之君！德行大涨 +20，威名大长 +25！`
+              };
+            } else {
+              const updated = {
+                ...current,
+                popularity: Math.max(0, current.popularity - 15)
+              };
+              return {
+                updatedStats: updated,
+                logMessage: `⚠️ 【红颜-貂蝉】德行稍逊，辞不达意。貂蝉微微叹息。民间传闻主公志向浅薄，地方民心（民声）-15。`
+              };
+            }
+          }
+        },
+        {
+          text: '【雄霸天下】逐鹿中原，顺天改命（考验：智力与武力双门槛 70）',
+          action: (current: PlayerStats) => {
+            if (current.intelligence >= 70 && current.force >= 70) {
+              const updated = {
+                ...current,
+                intelligence: current.intelligence + 4,
+                force: current.force + 4,
+                troops: Math.min(50000, current.troops + 250)
+              };
+              return {
+                updatedStats: updated,
+                logMessage: `⚔️ 【红颜-貂蝉】主公拔剑指天，豪气干云！貂蝉折服于主公的枭雄大略与惊世武艺，暗中号召群侠投奔，智力 +4，武力 +4，新兵精卒入营 +250 骑！`
+              };
+            } else {
+              const updated = {
+                ...current,
+                gold: Math.max(0, current.gold - 80)
+              };
+              return {
+                updatedStats: updated,
+                logMessage: `⚠️ 【红颜-貂蝉】才具不足，谈吐空洞。貂蝉冷淡退下。主公惭愧，打赏门人 80 黄金作为掩饰，消耗黄金 -80。`
+              };
+            }
+          }
+        }
+      ]
     }
   ];
 

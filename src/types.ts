@@ -27,7 +27,20 @@ export interface PlayerStats {
   deviance: number;     // 历史扭转度 (%)
   autoDevelopmentGold?: number;         // 设定的被动基建投资基金
   autoDevelopmentPassiveIncome?: number;// 累加常态被动折税总增量
+  activeUnitTrait?: SpecializedUnitTrait; // 当前主力兵种特质
+}
 
+// 特化兵种特质定义
+export type SpecializedUnitTrait = 'HEAVY_CAVALRY' | 'SIEGE_ENGINEERS' | 'MOUNTAINEERS' | 'NAVAL_MARINES';
+
+// 细作谍报网络情报定义
+export interface SpyIntel {
+  factionId: FactionId;
+  revealedAt: string;     // 侦察时间 (如：公元184年3月)
+  troops: number;         // 敌军兵马总数
+  readiness: number;      // 城防警戒度 (0-100)
+  garrisonTraits: string[]; // 守军特质与守备利器
+  description: string;    // 细作报文
 }
 
 // 历史武将信息

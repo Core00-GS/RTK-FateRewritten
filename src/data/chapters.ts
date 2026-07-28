@@ -491,15 +491,15 @@ export const GAME_SCENES: Record<string, StoryScene> = {
     options: [
       {
         id: 'c1_t_au_opt1',
-        text: '【全力支持张飞】赞同张翼德！备办乌牛白马、丰厚贡礼，正式敬告天地！',
+        text: '【全力支持张飞】赞同张翼德！备办乌牛白马、丰厚贡礼，随后动身前往铁匠铺收购镔铁，筹备神兵与大祭！',
         effect: {
-          statChanges: { popularity: 10, gold: -100 }
+          statChanges: { virtue: 10, gold: -100 }
         },
-        nextSceneId: 'c1_with_zhangfei_path'
+        nextSceneId: 'c1_buy_tools_path'
       },
       {
         id: 'c1_t_au_opt2',
-        text: '【听从云长之虑】支持关云长！认为如今军情紧急，不宜过于铺张，仅购备兵刃重甲大旗，便是不朽结拜！',
+        text: '【听从云长之虑】支持关云长！认为如今军情紧急，不宜过于铺张，先去铁匠铺购备兵刃重甲，随后低调结拜！',
         effect: {
           statChanges: { intelligence: 5, gold: 50, troops: 50 }
         },
@@ -1287,10 +1287,10 @@ export const GAME_SCENES: Record<string, StoryScene> = {
   'c6_start': {
     id: 'c6_start',
     chapterId: 'c6',
-    title: '麦城星落，逆转双亡',
+    title: '麦城星落，荆州风云',
     year: 219,
-    narration: '公元219年。赤壁之后群英角逐，眼见大业就要初成。然而天道不常，蜀汉宿将关羽孤军北伐被困麦城，前有曹军阻击，后有孙权盟友卑鄙偷袭割首；而几年后，五丈原荒山冷风，丞相孔明殚精竭虑、天数难违，续命之灯被魏兵打破，生命已入死路。这两曲在百年来令无数后人心碎的历史悲歌，就在你的大军一念之间，要如何逆转？',
-    historicalFact: '历史上吕蒙白衣渡江背叛刘备，关羽由于缺乏后方援助导致父子二人兵败麦城，壮烈就义首级被送交于曹。其后诸葛孔明六出祁山在五丈原累倒过世，蜀汉从此走入下限悲风。',
+    narration: '公元219年。赤壁之后群英角逐，眼见大业就要初成。然而天道不常，蜀汉宿将关羽孤军北伐被困麦城，前有曹军阻击，后有孙权盟友偷袭割首。荆州危在旦夕，武圣濒临绝境！在这危急关头，你的大军一念之间，要如何挽狂澜于既倒？',
+    historicalFact: '历史上吕蒙白衣渡江背叛刘备，关羽由于缺乏后方援助导致父子二人兵兵败麦城，壮烈就义，荆州彻底失陷。',
     options: [
       {
         id: 'c6_s_opt1',
@@ -1302,28 +1302,28 @@ export const GAME_SCENES: Record<string, StoryScene> = {
           changeFaction: { regionId: 'jianye', faction: 'PLAYER' },
           customLog: '雷电交加，麦城守关者绝望中。只听战场尽头传来金鼓！你引大军破重围，一枪挑飞吕蒙！关云长得脱。他单膝下跪，自此青龙长刀，只为了你的旗帜而舞！'
         },
-        nextSceneId: 'c7_start'
+        nextSceneId: 'c7_wuzhang'
       },
       {
         id: 'c6_s_opt2',
-        text: '【延寿卧龙】访西域雪原与仙人药草，拼却己身修行，在五丈原替孔明改命延寿！',
-        requirement: { attribute: 'intelligence', minVal: 85, neededGold: 800 },
+        text: '【威震华夏·配合水淹七军】与关羽合击襄阳，擒庞德、降于禁，一举全歼魏军水陆主力！',
+        requirement: { attribute: 'force', minVal: 78, neededTroops: 2500 },
         effect: {
-          statChanges: { intelligence: 15, virtue: 10, prestige: 500, deviance: 20 },
-          customLog: '五丈原天雷阵。诸葛孔明绝望等死之时，你推账而入，辅以神功，终于燃亮七星重灯，替师续命十二载！武侯自此红光满面，出祁山，大破群魏大营，光耀九州！'
+          statChanges: { force: 10, leadership: 10, troops: -800, prestige: 400 },
+          customLog: '大雨滂沱，汉水暴涨！你亲督破浪战舰与关云长前后夹击，七军皆陷水泽，于禁降、庞德授首！关云长抚须狂笑：“主公妙算，真天神也！”'
         },
-        nextSceneId: 'c7_start'
+        nextSceneId: 'c7_wuzhang'
       },
       {
         id: 'c6_s_opt3',
-        text: '不理会残兵朽将，乘各大阵营元气大伤，主力进军巴蜀成都夺取天下粮仓！',
+        text: '不理会荆州风云，乘各大阵营元气大伤，主力进军巴蜀成都夺取天下粮仓！',
         effect: {
           statChanges: { troops: 8000, politics: 15, gold: 3000 },
           addGeneral: 'jiangwei',
           changeFaction: { regionId: 'chengdu', faction: 'PLAYER' },
           customLog: '你选择抛弃情谊。在大乱大变中，你一举翻破剑阁之险，兵入成都，刘禅率蜀汉臣服。你在锦官城里大阅新兵，招得少年名将姜维，声威夺顶！'
         },
-        nextSceneId: 'c7_start'
+        nextSceneId: 'c7_wuzhang'
       }
     ]
   },
@@ -1343,7 +1343,7 @@ export const GAME_SCENES: Record<string, StoryScene> = {
           addGeneral: 'jiangwei',
           customLog: '你在南方大竖汉朝正统圣大义，宣布曹魏倒悬汉土。北方少年姜维听闻，连夜跨马穿越秦岭来奔，自此你在江南川蜀拥有大势！'
         },
-        nextSceneId: 'c7_start'
+        nextSceneId: 'c7_wuzhang'
       },
       {
         id: 'c6_cw_opt2',
@@ -1353,12 +1353,46 @@ export const GAME_SCENES: Record<string, StoryScene> = {
           statChanges: { intelligence: 10, politics: 15, gold: 2000 },
           customLog: '不露痕迹。你收买人心数载，魏国上层重臣及诸将中有逾半数与你遥奉天诏，西凉的大门已被你悄悄摸入。'
         },
+        nextSceneId: 'c7_wuzhang'
+      }
+    ]
+  },
+
+  // ------------ CHAPTER 7 : WUZHANGYUAN ------------
+  'c7_wuzhang': {
+    id: 'c7_wuzhang',
+    chapterId: 'c7',
+    title: '五丈原秋风，禳星续命',
+    year: 234,
+    narration: '公元234年。时光荏苒十五载，五丈原荒山冷风吹拂。丞相诸葛孔明六出祁山，殚精竭虑、积劳成疾，在帐中布下七星大灯欲求续命。主灯明灭不定，孔明生命已入死路。当此危急时刻，你手握西域仙草与通天神功，要如何替武侯逆天改命？',
+    historicalFact: '历史上诸葛亮于公元234年病逝于五丈原，蜀汉失去主心骨，北伐事业功亏一篑。',
+    options: [
+      {
+        id: 'c7_wuzhang_opt1',
+        text: '【延寿卧龙】访西域雪原与仙人药草，拼却己身修行，在五丈原替孔明改命延寿！',
+        requirement: { attribute: 'intelligence', minVal: 85, neededGold: 800 },
+        effect: {
+          statChanges: { intelligence: 15, virtue: 10, prestige: 500, deviance: 20 },
+          addGeneral: 'zhugeliang',
+          customLog: '五丈原天雷阵！诸葛孔明绝望等死之时，你推账而入，辅以神功，终于燃亮七星重灯，替师续命十二载！武侯自此红光满面，出祁山，大破群魏大营，光耀九州！'
+        },
+        nextSceneId: 'c7_start'
+      },
+      {
+        id: 'c7_wuzhang_opt2',
+        text: '【托孤重臣】尊奉孔明遗志，接过蜀汉帅印，总揽汉室北伐全军！',
+        requirement: { attribute: 'leadership', minVal: 80 },
+        effect: {
+          statChanges: { leadership: 15, virtue: 15, troops: 5000 },
+          addGeneral: 'jiangwei',
+          customLog: '孔明执子之手涕泣，将兵书长卷与姜维悉数托付于你。你高举大旗，号令三军继续誓师出征！'
+        },
         nextSceneId: 'c7_start'
       }
     ]
   },
 
-  // ------------ CHAPTER 7 ------------
+  // ------------ CHAPTER 7 : FINAL WAR ------------
   'c7_start': {
     id: 'c7_start',
     chapterId: 'c7',

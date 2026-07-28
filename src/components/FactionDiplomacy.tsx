@@ -4,9 +4,9 @@
  */
 
 import React, { useState } from 'react';
-import { PlayerStats, FactionId } from '../types';
+import { PlayerStats, FactionId, SpyIntel } from '../types';
 import { FACTIONS } from '../data/regions';
-import { Gift, Heart, ShieldAlert, Award, TrendingUp, Sparkles, Swords, UserCheck } from 'lucide-react';
+import { Gift, Heart, ShieldAlert, Award, TrendingUp, Sparkles, Swords, UserCheck, Eye, Search, FileText } from 'lucide-react';
 
 interface FactionDiplomacyProps {
   playerStats: PlayerStats;
@@ -15,6 +15,8 @@ interface FactionDiplomacyProps {
   setRelations: React.Dispatch<React.SetStateAction<Record<FactionId, number>>>;
   showToast: (msg: string) => void;
   onAddBattleLog: (msg: string, type: 'action' | 'casualty' | 'gain' | 'random_event') => void;
+  spyIntel?: Partial<Record<FactionId, SpyIntel>>;
+  setSpyIntel?: React.Dispatch<React.SetStateAction<Record<FactionId, SpyIntel>>>;
 }
 
 export default function FactionDiplomacy({
@@ -23,7 +25,9 @@ export default function FactionDiplomacy({
   relations,
   setRelations,
   showToast,
-  onAddBattleLog
+  onAddBattleLog,
+  spyIntel = {},
+  setSpyIntel
 }: FactionDiplomacyProps) {
   const [selectedFactionId, setSelectedFactionId] = useState<FactionId>('CAOCAO');
 
@@ -274,6 +278,69 @@ export default function FactionDiplomacy({
     showToast("大宗丝绸互换告捷！民声高昂，声望大幅攀升！");
   };
 
+  // 5. Spy Network Mission (细作侦察网络)
+  const dispatchSpyNetwork = () => {
+    const cost = 100;
+    if (playerStats.gold < cost) {
+      showToast(`国库黄金储备不足 ${cost}，无力支付细作密谍潜入经费！`);
+      return;
+    }
+
+    setPlayerStats(prev => ({
+      ...prev,
+      gold: prev.gold - cost
+    }));
+
+    // Estimate troops based on faction identity
+    const baseTroopsMap: Record<string, number> = {
+      CAOCAO: 45000,
+      DONGZHUO: 50000,
+      LIUBEI: 22000,
+      SUNQUAN: 38000,
+      JIN: 55000,
+      YELLOW_TURBAN: 30000,
+      XIONGNU: 28000,
+      HAN: 18000
+    };
+    const baseTroops = baseTroopsMap[selectedFactionId] || 25000;
+    const estTroops = baseTroops + Math.floor(Math.random() * 8000) - 4000;
+    const estReadiness = Math.floor(Math.random() * 45) + 50; // 50-95%
+    
+    const possibleGarrisonTraits = [
+      "重弩弓弩手防线",
+      "巨弩投石机壁垒",
+      "重骑冲锋铁骑营",
+      "深沟高垒城防哨",
+      "粮仓积草丰盈",
+      "烽火连天戒严阵"
+    ];
+    // Shuffle and pick 2
+    const shuffled = [...possibleGarrisonTraits].sort(() => Math.random() - 0.5);
+    const traits = shuffled.slice(0, 2);
+
+    const intelObj: SpyIntel = {
+      factionId: selectedFactionId,
+      revealedAt: `公元 ${playerStats.year} 年 ${playerStats.month} 月`,
+      troops: estTroops,
+      readiness: estReadiness,
+      garrisonTraits: traits,
+      description: `细作密报：【${activeFaction.name}】领袖 ${activeFaction.leader} 正于边关筑垒设防。中军兵马约 ${estTroops.toLocaleString()} 员，城防戒备防备度达 ${estReadiness}%！守备利器为『${traits.join("』与『")}』。`
+    };
+
+    if (setSpyIntel) {
+      setSpyIntel(prev => ({
+        ...prev,
+        [selectedFactionId]: intelObj
+      }));
+    }
+
+    const logMsg = `🕵️ 【细作谍报网络】主公拨发 $${cost} 黄金部署细作密谍渗入【${activeFaction.name}】！回报：敌兵总计约 ${estTroops.toLocaleString()} 员，戒备防备度 ${estReadiness}%，探得敌营守备特质『${traits.join('』『')}』！`;
+    onAddBattleLog(logMsg, 'action');
+    showToast(`🕵️ 谍报网络破译成功！已探明【${activeFaction.name}】兵马编制与城防警戒度！`);
+  };
+
+  const currentIntel = spyIntel[selectedFactionId];
+
   return (
     <div id="diplomacy-interface-panel" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Target Factions Select List */}
@@ -352,7 +419,7 @@ export default function FactionDiplomacy({
           </div>
 
           {/* Faction Intro Details */}
-          <div className="bg-artistic-cream p-4 border border-artistic-charcoal/30 mb-6 rounded-none">
+          <div className="bg-artistic-cream p-4 border border-artistic-charcoal/30 mb-4 rounded-none">
             <div className="grid grid-cols-2 gap-2 text-xs font-serif text-stone-800 border-b border-artistic-charcoal/25 pb-2 mb-2 font-black">
               <div>领袖：<span className="text-artistic-crimson">{activeFaction.leader}</span></div>
               <div className="text-right">旗帜色：<span className="font-mono" style={{ color: activeFaction.color }}>{activeFaction.color}</span></div>
@@ -361,6 +428,52 @@ export default function FactionDiplomacy({
               {activeFaction.description}
             </p>
           </div>
+
+          {/* Spy Intel Report Card */}
+          {currentIntel ? (
+            <div className="bg-stone-900 border-2 border-amber-600 text-stone-100 p-3.5 mb-6 shadow-md rounded-none">
+              <div className="flex justify-between items-center border-b border-amber-600/40 pb-2 mb-2">
+                <span className="font-serif font-black text-xs text-amber-400 flex items-center gap-1.5">
+                  <Eye className="w-4 h-4 text-amber-400 animate-pulse" />
+                  【细作密谍·敌情密卷】 ({currentIntel.revealedAt})
+                </span>
+                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 px-2 py-0.5 border border-emerald-600/50">
+                  ✨ 侦察已掌握
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs font-serif mb-2">
+                <div className="bg-stone-800/80 p-2 border border-stone-700">
+                  <span className="text-stone-400 text-[10px] block">驻防总兵马估算:</span>
+                  <span className="text-amber-300 font-mono font-bold text-sm">
+                    ⚔️ {currentIntel.troops.toLocaleString()} 员
+                  </span>
+                </div>
+                <div className="bg-stone-800/80 p-2 border border-stone-700">
+                  <span className="text-stone-400 text-[10px] block">城防戒备防备度:</span>
+                  <span className={`font-mono font-bold text-sm ${currentIntel.readiness > 75 ? 'text-red-400' : 'text-amber-400'}`}>
+                    🛡️ {currentIntel.readiness}% ({currentIntel.readiness > 75 ? '严阵以待' : '疏于防范'})
+                  </span>
+                </div>
+              </div>
+              <div className="text-[11px] font-serif text-stone-300 leading-relaxed border-t border-stone-800 pt-2 flex items-start gap-1">
+                <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-amber-200 font-bold">探得守备利器与兵种特质：</span>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {currentIntel.garrisonTraits.map((t, idx) => (
+                      <span key={idx} className="bg-amber-950/90 text-amber-300 border border-amber-700/60 px-2 py-0.5 text-[10px]">
+                        🏷️ {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-stone-100 border border-dashed border-stone-300 p-2.5 mb-6 text-center text-stone-500 font-serif text-xs">
+              🕵️ 尚无该势力的最新细作报文。可使用下方“派遣细作”探明兵力与防备度。
+            </div>
+          )}
 
           {/* Dynamic Interactive Diplomatic Commands Matrix */}
           <h3 className="font-serif font-black text-sm text-artistic-charcoal mb-3 border-l-4 border-artistic-crimson pl-2.5">
@@ -446,7 +559,30 @@ export default function FactionDiplomacy({
               </button>
             </div>
 
-            {/* Act 4: 威压恐吓缴粮 */}
+            {/* Act 5: 细作谍报网络 (Spy Network) */}
+            <div className="bg-amber-50/70 border border-amber-800/30 p-3.5 rounded-none flex flex-col justify-between shadow-sm col-span-1 md:col-span-2">
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <h4 className="font-serif font-black text-sm text-stone-900 flex gap-1.5 items-center">
+                    <Search className="w-4 h-4 text-amber-800 animate-bounce" />
+                    🕵️ 细作侦察网络 (Spy Network Mission)
+                  </h4>
+                  <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-500/30 px-2 py-0.5 font-bold font-mono">
+                    🌾 100 黄金
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-800 font-serif leading-relaxed mb-3">
+                  斥资拨款收买其边守与牙门小吏，派遣细作密谍潜入【<b>{activeFaction.name}</b>】周边郡县。<b>精准探明敌阵兵马总额、城防戒备防备度、守军布防利器</b>，并在情报密卷与天下沙盘中揭示！
+                </p>
+              </div>
+              <button
+                onClick={dispatchSpyNetwork}
+                className="w-full bg-amber-900 hover:bg-artistic-crimson text-white font-serif font-bold text-xs py-2 px-3 border border-amber-950 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                拨付经费 100 黄金 · 派遣细作渗入侦察
+              </button>
+            </div>
             <div className="bg-artistic-cream border border-artistic-charcoal/20 p-3.5 rounded-none flex flex-col justify-between shadow-sm">
               <div>
                 <div className="flex justify-between items-center mb-1.5">

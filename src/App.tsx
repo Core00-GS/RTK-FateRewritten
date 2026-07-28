@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { PlayerStats, Region, General, SideQuest, HistoryRecord, FactionId } from './types';
+import { PlayerStats, Region, General, SideQuest, HistoryRecord, FactionId, SpyIntel, SpecializedUnitTrait } from './types';
 import { GAME_CHAPTERS, GAME_SCENES } from './data/chapters';
 import { getTriviaForScene } from './data/trivia';
 import { INITIAL_REGIONS, FACTIONS } from './data/regions';
@@ -18,18 +18,20 @@ import FactionDiplomacy from './components/FactionDiplomacy';
 import RandomEventsTab from './components/RandomEventsTab';
 import CivilianModsTab from './components/CivilianModsTab';
 import TrainingTab from './components/TrainingTab';
+import CityMapTab from './components/CityMapTab';
 import AnimatedCounter from './components/AnimatedCounter';
+import D3AttritionChart from './components/D3AttritionChart';
 import { motion, AnimatePresence } from 'motion/react';
 import { sfx } from './utils/audio';
 import { migrateSaveData } from './utils/saveMigration';
 import { SOLAR_ACHIEVEMENTS } from './data/achievements';
 import HistoryTimelineD3 from './components/HistoryTimelineD3';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
 import { 
   Skull, Sparkles, BookOpen, Map, Landmark, Users, 
   HelpCircle, Archive, RotateCcw, Save, ShieldCheck, 
   Trash2, Award, ShieldAlert, Swords, Quote, Calendar, Coins, Volume2, VolumeX, AlertCircle, Info, X,
-  Sun, CloudFog, CloudRain
+  Sun, CloudFog, CloudRain, Snowflake, AlertTriangle, Search
 } from 'lucide-react';
 
 const SAVE_KEY = 'three_kingdoms_retro_alt_save_v2';
@@ -43,7 +45,7 @@ interface WeatherDetails {
   visibilityDesc: string;
 }
 
-const WEATHER_DETAILS: Record<'CLEAR' | 'HEAVY_FOG' | 'SUDDEN_RAIN', {
+const WEATHER_DETAILS: Record<'CLEAR' | 'HEAVY_FOG' | 'SUDDEN_RAIN' | 'BLIZZARD', {
   name: string;
   icon: string;
   speedModifierDays: number;
@@ -70,6 +72,13 @@ const WEATHER_DETAILS: Record<'CLEAR' | 'HEAVY_FOG' | 'SUDDEN_RAIN', {
     speedModifierDays: 4,
     description: '平地起泥泽，江河泛滥！辎重队伍推行极难，行军追加限制 +4 日！',
     visibilityDesc: '🌧️ 骤雨狂砸，地表雨横泥滑，两军将士皆无法看清对方帅旗！'
+  },
+  BLIZZARD: {
+    name: '凛冬暴雪',
+    icon: '❄️',
+    speedModifierDays: 5,
+    description: '极寒雪风呼啸，平地积雪盈尺！行军开销加倍（耗粮耗金+100%），士气持续遭受侵蚀 (-8)！',
+    visibilityDesc: '❄️ 漫天冰雪封冻汉土，寒风削骨，全军士气低迷，行军消耗翻倍！'
   }
 };
 
@@ -285,7 +294,7 @@ const getEvaluationHint = (opt: any): string => {
 
 export default function App() {
   // --- Game Session State ---
-  const [gameState, setGameState] = useState<'MAIN_MENU' | 'INTRO' | 'STORY' | 'MAP' | 'ROSTER' | 'GOV' | 'DIPLOMACY' | 'RANDOM_EVENTS' | 'CIVILIAN_MODS' | 'SIDE_QUESTS' | 'ARCHIVE' | 'ENDING' | 'TRAINING' | 'ACHIEVEMENTS'>('MAIN_MENU');
+  const [gameState, setGameState] = useState<'MAIN_MENU' | 'INTRO' | 'STORY' | 'MAP' | 'ROSTER' | 'GOV' | 'DIPLOMACY' | 'RANDOM_EVENTS' | 'CIVILIAN_MODS' | 'SIDE_QUESTS' | 'ARCHIVE' | 'ENDING' | 'TRAINING' | 'ACHIEVEMENTS' | 'CITY'>('MAIN_MENU');
   const [regionAnnotations, setRegionAnnotations] = useState<Record<string, string>>({});
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
   
@@ -410,6 +419,8 @@ export default function App() {
   const [archiveSearch, setArchiveSearch] = useState<string>('');
   const [archiveFilter, setArchiveFilter] = useState<'ALL' | 'Combat' | 'Diplomacy' | 'Personal' | 'Domestic'>('ALL');
   const [archiveSubTab, setArchiveSubTab] = useState<'CHRONICLES' | 'CALENDAR' | 'TIMELINE'>('CHRONICLES');
+  const [winningStreak, setWinningStreak] = useState<number>(0);
+  const [morale, setMorale] = useState<number>(100);
   
   // Battle Summary Popup State for post-battle analysis
   const [battleSummary, setBattleSummary] = useState<{
@@ -501,7 +512,9 @@ export default function App() {
   const [taxCooldown, setTaxCooldown] = useState<boolean>(false);
   const [playerLocation, setPlayerLocation] = useState<string>('zhuojun');
   const [exploredRegions, setExploredRegions] = useState<string[]>(['zhuojun']);
-  const [currentWeather, setCurrentWeather] = useState<'CLEAR' | 'HEAVY_FOG' | 'SUDDEN_RAIN'>('CLEAR');
+  const [currentWeather, setCurrentWeather] = useState<'CLEAR' | 'HEAVY_FOG' | 'SUDDEN_RAIN' | 'BLIZZARD'>('CLEAR');
+  const [spyIntel, setSpyIntel] = useState<Record<FactionId, SpyIntel>>({});
+  const [battleLogSearch, setBattleLogSearch] = useState<string>('');
 
   // --- Battle Logs State ---
   const [battleLogs, setBattleLogs] = useState<Array<{
@@ -528,6 +541,11 @@ export default function App() {
   const [activeTrick, setActiveTrick] = useState<'backwater' | 'cicada' | null>(null);
   const [trickCooldown, setTrickCooldown] = useState<number>(0); // 0 to 100 for progress percent
   const [trickSecondsLeft, setTrickSecondsLeft] = useState<number>(0); // countdown seconds
+
+  // --- Tactical Combination States ---
+  const [comboTactic1, setComboTactic1] = useState<string>(() => localStorage.getItem('tk_combo_tactic_1') || '背水一战');
+  const [comboTactic2, setComboTactic2] = useState<string>(() => localStorage.getItem('tk_combo_tactic_2') || '锋矢阵');
+  const [comboCooldownSeconds, setComboCooldownSeconds] = useState<number>(0);
 
   // --- Option Pagination State ---
   const [optionPage, setOptionPage] = useState<number>(0);
@@ -787,6 +805,108 @@ export default function App() {
     setPlayerStats(prev => ({ ...prev, troops: prev.troops + 200, intelligence: prev.intelligence + 1 }));
     showToast('🕊️ 【金蝉脱壳】遁守之计施演！6秒内主公潜行撤隐，暂避锋芒，禁止下达其他主线玺令。');
   };
+
+  // --- Tactical Combination Mechanics & Hotkey Triggers ---
+  const handleTriggerTacticalCombo = () => {
+    if (comboCooldownSeconds > 0) {
+      showToast(`⏳ 连携双璧战法『${comboTactic1} + ${comboTactic2}』尚在冷却中，余息 ${comboCooldownSeconds} 秒！`);
+      return;
+    }
+    if (activeTrick) {
+      showToast('⚠️ 当前军中大将正处于奇谋专注指挥中，分神乏术！');
+      return;
+    }
+
+    sfx.playDrum();
+
+    // Set combination cooldown to 15 seconds
+    setComboCooldownSeconds(15);
+
+    let troopsGained = 0;
+    let goldChange = 0;
+    let forceGained = 0;
+    let prestigeGained = 15;
+    let logMsg = `🔥 【战术连携绝技 [Q]】主公一键融汇阵前连携『${comboTactic1}』与『${comboTactic2}』！两仪化生，攻守合流！\n`;
+
+    const applyTactic = (tactic: string) => {
+      if (tactic === '背水一战') {
+        forceGained += 3;
+        logMsg += ` ⚔️ 『背水一战』：临阵武勇猛飙 +3，全军将士破釜沉舟，爆发出极限杀伤！\n`;
+      } else if (tactic === '锋矢阵') {
+        troopsGained += 300;
+        logMsg += ` 🏹 『锋矢阵』：锋矢破敌极速扫荡，缴得流民游卒 300 人归入中营！\n`;
+      } else if (tactic === '暗度陈仓') {
+        goldChange += 200;
+        logMsg += ` 💰 『暗度陈仓』：奇袭敌后粮库，府库新增黄金 200 金！\n`;
+      } else if (tactic === '围魏救赵') {
+        prestigeGained += 25;
+        logMsg += ` 📜 『围魏救赵』：侧面围攻解围合击，中兴大业声望威势大涨 +25 点！\n`;
+      } else if (tactic === '釜底抽薪') {
+        troopsGained += 150;
+        goldChange += 100;
+        logMsg += ` 🌾 『釜底抽薪』：断敌钱粮，收拢其后军 150 兵丁并夺黄金 100 金！\n`;
+      } else if (tactic === '火烧连营') {
+        forceGained += 1;
+        prestigeGained += 20;
+        logMsg += ` 🔥 『火烧连营』：狂焰焚天震慑敌胆，全军威望 +20 且武勇提升 +1！\n`;
+      }
+    };
+
+    applyTactic(comboTactic1);
+    applyTactic(comboTactic2);
+
+    setPlayerStats(prev => ({
+      ...prev,
+      troops: prev.troops + troopsGained,
+      gold: prev.gold + goldChange,
+      force: Math.min(100, prev.force + forceGained),
+      prestige: prev.prestige + prestigeGained
+    }));
+
+    const comboLog = {
+      id: `combo_${Date.now()}`,
+      chapterId: currentChapterId,
+      timestamp: `公元${playerStats.year}年${playerStats.month}月${playerStats.day}日`,
+      message: logMsg,
+      type: 'gain' as const
+    };
+    setBattleLogs(prev => [comboLog, ...prev]);
+    showToast(`🔥 绝技连携：『${comboTactic1} + ${comboTactic2}』惊天发动！`);
+  };
+
+  // Cooldown countdown effect
+  useEffect(() => {
+    if (comboCooldownSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setComboCooldownSeconds(prev => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [comboCooldownSeconds]);
+
+  // Shortcut Listener for Quick Combo trigger using 'Q'
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.getAttribute('contenteditable') === 'true'
+      )) {
+        return;
+      }
+
+      if (e.key.toLowerCase() === 'q') {
+        if (gameState === 'STORY') {
+          e.preventDefault();
+          handleTriggerTacticalCombo();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [gameState, comboTactic1, comboTactic2, comboCooldownSeconds, activeTrick, playerStats, currentChapterId]);
 
   // Timeline anomaly detection helpers
   const detectTimeConflict = (rec: HistoryRecord, allRecs: HistoryRecord[]) => {
@@ -1255,6 +1375,28 @@ export default function App() {
 
     return () => clearInterval(interval);
   }, [gameState]);
+
+  // --- 5-second Morale fluctuation checking ---
+  useEffect(() => {
+    if (gameState === 'INTRO' || gameState === 'MAIN_MENU') return;
+    const interval = setInterval(() => {
+      setMorale(prev => {
+        let delta = Math.floor(Math.random() * 7) - 3; // -3 to +3
+        if (winningStreak >= 3) {
+          delta += 2; // general upward trend
+        }
+        const nextMorale = Math.max(50, Math.min(150, prev + delta));
+        
+        if (nextMorale >= 120 && prev < 120) {
+          showToast("🔥 三军用命，气吐万里如虎！全军士气极其昂扬高涨！");
+        } else if (nextMorale <= 65 && prev > 65) {
+          showToast("⚠️ 连绵行军，士卒出现疲劳，士气稍显低落，宜去武练营歇息！");
+        }
+        return nextMorale;
+      });
+    }, 5000); // Check every 5 seconds
+    return () => clearInterval(interval);
+  }, [gameState, winningStreak]);
 
   const loadGame = () => {
     const cached = localStorage.getItem(SAVE_KEY);
@@ -1811,6 +1953,19 @@ export default function App() {
       Object.keys(effect.statChanges).forEach((key) => {
         let change = effect.statChanges[key];
 
+        // Apply winningStreak bonus to leadership if it's a battle and winningStreak >= 3
+        if (key === 'leadership' && typeof change === 'number' && change > 0) {
+          const optTroopsChange = effect.statChanges.troops || 0;
+          const logText = (activeScene.title + " " + (effect.customLog || "")).toLowerCase();
+          const isBattle = optTroopsChange < 0 && (logText.includes('战') || logText.includes('兵') || logText.includes('袭') || logText.includes('军') || logText.includes('围') || logText.includes('斩') || logText.includes('平叛') || logText.includes('血') || logText.includes('攻') || logText.includes('突'));
+          
+          if (isBattle && winningStreak >= 3) {
+            const bonus = Math.max(1, Math.round(change * 0.1));
+            change = change + bonus;
+            showToast(`🔥 【百战雄师 · 连胜勋重】连续大捷 ${winningStreak} 场！本场战役统帅收益额外增加 10% (额外 +${bonus} 统帅)！`);
+          }
+        }
+
         // Apply Battle Formation Active Troop Stance impacts to troop loss/survival rates
         if (key === 'troops' && typeof change === 'number' && change < 0) {
           if (activeStance === 'DEFENSIVE') {
@@ -1840,6 +1995,38 @@ export default function App() {
             showToast(`🏜️ 【地域·塞外荒漠】：无遮无拦、狂沙肆虐，沙漠环境导致额外折损了 ${extraLossByTerrain} 员士卒！`);
           } else if (terrainType === 'PLAIN') {
             showToast(`🌾 【地域·平原旷野】：正面搏杀，地势开阔无特定加成。`);
+          }
+
+          // Apply Specialized Unit Trait Modifiers based on terrain!
+          const activeTrait = playerStats.activeUnitTrait || 'HEAVY_CAVALRY';
+          if (activeTrait === 'HEAVY_CAVALRY') {
+            if (terrainType === 'PLAIN') {
+              const saved = Math.round(Math.abs(change) * 0.25);
+              change = change + saved;
+              showToast(`🐎 【重铠铁骑·平原突击】：铁骑平原纵横破阵，特化加成免除 ${saved} 员士卒折损！`);
+            } else if (terrainType === 'MOUNTAIN') {
+              const extra = Math.round(Math.abs(change) * 0.10);
+              change = change - extra;
+              showToast(`⚠️ 【重铠铁骑·山地受阻】：险峰山道迟滞骑兵机动，特化劣势追加折损了 ${extra} 员士卒！`);
+            }
+          } else if (activeTrait === 'SIEGE_ENGINEERS') {
+            if (terrainType === 'CITY') {
+              const saved = Math.round(Math.abs(change) * 0.30);
+              change = change + saved;
+              showToast(`🏹 【攻城械师·破壁摧城】：霹雳冲车轰砸城垒，特化加成免除 ${saved} 员士卒折损！`);
+            }
+          } else if (activeTrait === 'MOUNTAINEERS') {
+            if (terrainType === 'MOUNTAIN' || terrainType === 'FOREST') {
+              const saved = Math.round(Math.abs(change) * 0.25);
+              change = change + saved;
+              showToast(`⛰️ 【山地藤甲·履险伏击】：山林陡崖如履平地，特化加成免除 ${saved} 员士卒折损！`);
+            }
+          } else if (activeTrait === 'NAVAL_MARINES') {
+            if (terrainType === 'RIVER') {
+              const saved = Math.round(Math.abs(change) * 0.25);
+              change = change + saved;
+              showToast(`🌊 【水军舟楫·破浪横江】：艨艟大舰水战横渡，特化加成免除 ${saved} 员士卒折损！`);
+            }
           }
 
           // Apply weather-formation synergy bonus!
@@ -2086,6 +2273,16 @@ export default function App() {
       const isBattle = lost > 0 && (logText.includes('战') || logText.includes('兵') || logText.includes('袭') || logText.includes('军') || logText.includes('围') || logText.includes('斩') || logText.includes('平叛') || logText.includes('血') || logText.includes('攻') || logText.includes('突'));
       if (isBattle) {
         const isWin = !logText.includes('败') && !logText.includes('溃退') && !logText.includes('全军覆没');
+        if (isWin) {
+          setWinningStreak(prev => {
+            const nextVal = prev + 1;
+            showToast(`🔥 连战连捷！主公连续取得第 ${nextVal} 场会战大捷！`);
+            return nextVal;
+          });
+        } else {
+          setWinningStreak(0);
+          showToast(`⚠️ 连胜中断！主公会战失利，战役连胜场次已重置清零。`);
+        }
         triggerBattleSummary(
           sceneData.title,
           isWin ? 'VICTORY' : 'DEFEAT',
@@ -2262,7 +2459,7 @@ export default function App() {
     setLastOutcome(null);
 
     // direct scene progression (uninterrupted by random events, which are relocated to their dedicated tab)
-    if (nextId) {
+    if (nextId && GAME_SCENES[nextId]) {
       setCurrentSceneId(nextId);
       const nextSc = GAME_SCENES[nextId];
       if (nextSc && nextSc.chapterId !== currentChapterId) {
@@ -2271,6 +2468,12 @@ export default function App() {
       if (nextId.startsWith('ending_')) {
         setGameState('ENDING');
       }
+    } else {
+      // Robustness: If nextSceneId is missing or illegal, fallback to the current chapter's first valid scene
+      const fallbackSceneId = Object.keys(GAME_SCENES).find(id => GAME_SCENES[id].chapterId === currentChapterId) || 'c1_0';
+      console.warn(`[天命警示] 检测到非法或空下一幕场景 ID: "${nextId}"。已自动退回归当前章节首个安全情景: "${fallbackSceneId}"`);
+      showToast(`🔮 【天命纠偏】前方混沌无路！命运已安然归于当前章节的首个场景。`);
+      setCurrentSceneId(fallbackSceneId);
     }
   };
 
@@ -2282,11 +2485,13 @@ export default function App() {
     
     // Global Weather Random Trigger
     const rand = Math.random();
-    let nextWeather: 'CLEAR' | 'HEAVY_FOG' | 'SUDDEN_RAIN' = 'CLEAR';
-    if (rand < 0.25) {
+    let nextWeather: 'CLEAR' | 'HEAVY_FOG' | 'SUDDEN_RAIN' | 'BLIZZARD' = 'CLEAR';
+    if (rand < 0.20) {
       nextWeather = 'HEAVY_FOG';
-    } else if (rand < 0.50) {
+    } else if (rand < 0.40) {
       nextWeather = 'SUDDEN_RAIN';
+    } else if (rand < 0.60) {
+      nextWeather = 'BLIZZARD';
     }
     setCurrentWeather(nextWeather);
     const wDetail = WEATHER_DETAILS[nextWeather];
@@ -2302,13 +2507,16 @@ export default function App() {
     };
 
     const totalDays = term.marchingSpeedDays + wDetail.speedModifierDays;
+    const goldCost = nextWeather === 'BLIZZARD' ? term.marchingCostGold * 2 : term.marchingCostGold;
+    const moraleLoss = nextWeather === 'BLIZZARD' ? 8 : 0;
 
     setPlayerStats(prev => {
       const advanced = advanceTime(totalDays, prev);
       return {
         ...prev,
         ...advanced,
-        gold: Math.max(0, prev.gold - term.marchingCostGold)
+        gold: Math.max(0, prev.gold - goldCost),
+        morale: Math.max(10, prev.morale - moraleLoss)
       };
     });
     
@@ -2317,12 +2525,15 @@ export default function App() {
     
     // Construct elaborate logistics & battlefield visibility comment depending on weather
     let weatherLogComment = `。天气【${wDetail.name} ${wDetail.icon}】：${wDetail.description} 战局能见度：${wDetail.visibilityDesc}`;
+    if (nextWeather === 'BLIZZARD') {
+      weatherLogComment += ` ❄️ 暴雪极寒削削士气 (-8)，行军开支加倍 (-${goldCost} 黄金)！`;
+    }
     
     const travelLog = {
       id: `travel_${Date.now()}`,
       chapterId: currentChapterId,
       timestamp: dateStr,
-      message: `🐎 【行军进驻】主公率护军精骑出发，逢节气【${term.name} ${term.icon}】而遇天气【${wDetail.name} ${wDetail.icon}】。受${wDetail.name}及“${term.effectDescription}”共同作用，总耗时 ${totalDays} 日（其中含天气延误 ${wDetail.speedModifierDays} 天），开支饷金 -${term.marchingCostGold}。大部人马已于地区【${rName}】按律安防${weatherLogComment}`,
+      message: `🐎 【行军进驻】主公率护军精骑出发，逢节气【${term.name} ${term.icon}】而遇天气【${wDetail.name} ${wDetail.icon}】。受${wDetail.name}及“${term.effectDescription}”共同作用，总耗时 ${totalDays} 日（含天气延误 ${wDetail.speedModifierDays} 天），开支饷金 -${goldCost}。大部人马已于地区【${rName}】按律安防${weatherLogComment}`,
       type: 'action' as const
     };
     setBattleLogs(prev => [travelLog, ...prev]);
@@ -3155,7 +3366,11 @@ export default function App() {
         </div>
       ) : (
         /* --- Game core active frame --- */
-        <div id="active-game-board" className="w-full flex-1 flex flex-col justify-between space-y-5 z-10">
+        <div 
+          id="active-game-board" 
+          key={currentSceneId + '_' + gameState}
+          className="w-full flex-1 flex flex-col justify-between space-y-5 z-10 animate-fade-in"
+        >
           
           {/* Main callout HUD bar */}
           <div className="bg-artistic-cream border-2 border-artistic-charcoal p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-center shadow-sm">
@@ -3177,11 +3392,31 @@ export default function App() {
             </div>
 
             {/* Troops node */}
-            <div className="border-r border-artistic-charcoal/25 pr-2">
-              <div className="font-serif text-[10.5px] text-artistic-charcoal/80 uppercase">中营精锐兵卒：</div>
-              <div className="font-mono font-bold text-artistic-crimson text-lg flex items-center gap-1.5 animate-scrolling">
-                <Users className="w-4 h-4 text-artistic-crimson" />
+            <div 
+              className={`border-r border-artistic-charcoal/25 pr-3 pl-1.5 py-1 transition-all duration-500 rounded-none relative overflow-hidden ${
+                winningStreak >= 3 
+                  ? 'ring-2 ring-amber-500/80 shadow-[0_0_12px_rgba(245,158,11,0.6)] bg-amber-500/5' 
+                  : ''
+              }`}
+              title={winningStreak >= 3 ? `🔥 傲视群雄！大捷三连胜，全军军心极其亢奋，获金羽辉映特效！士气值：${morale}` : `中军精兵，士气值：${morale}`}
+            >
+              <div className="font-serif text-[10.5px] text-artistic-charcoal/80 uppercase flex justify-between items-center">
+                <span>中营精锐兵卒：</span>
+                <span className={`text-[9px] font-bold font-serif px-1 ${
+                  morale >= 120 ? 'text-amber-700 bg-amber-100' :
+                  morale <= 70 ? 'text-red-700 bg-red-100' : 'text-stone-600 bg-stone-100'
+                }`}>
+                  ⚔️ 士气:{morale}
+                </span>
+              </div>
+              <div className="font-mono font-bold text-artistic-crimson text-lg flex items-center gap-1.5 animate-scrolling mt-0.5">
+                <Users className={`w-4 h-4 text-artistic-crimson ${winningStreak >= 3 ? 'text-amber-600 animate-bounce' : ''}`} />
                 <AnimatedCounter value={playerStats.troops} suffix="人" />
+                {winningStreak >= 3 && (
+                  <span className="text-[10px] text-amber-600 font-serif font-black animate-pulse shrink-0 ml-1">
+                    👑 极!
+                  </span>
+                )}
               </div>
             </div>
 
@@ -3203,10 +3438,21 @@ export default function App() {
             </div>
 
             {/* Weather node */}
-            <div className="border-r border-artistic-charcoal/25 pr-2">
-              <div className="font-serif text-[10.5px] text-artistic-charcoal/80 uppercase mb-0.5">当前天下天时：</div>
+            <div className="border-r border-artistic-charcoal/25 pr-2 relative">
+              <div className="font-serif text-[10.5px] text-artistic-charcoal/80 uppercase mb-0.5 flex items-center justify-between">
+                <span>当前天下天时：</span>
+                {currentWeather !== 'CLEAR' && (
+                  <span className="text-[8.5px] bg-red-800 text-amber-300 font-bold font-serif px-1 py-0.2 animate-pulse flex items-center gap-0.5 border border-red-900 shadow-xs">
+                    <AlertTriangle className="w-2.5 h-2.5" />
+                    天时戒备
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2 mt-1">
-                <div className="relative flex items-center justify-center w-8 h-8 rounded-none border border-artistic-charcoal/30 bg-[#ebdcb9] overflow-hidden shrink-0 select-none">
+                <div className={`relative flex items-center justify-center w-8 h-8 rounded-none border ${
+                  currentWeather === 'BLIZZARD' ? 'border-sky-500 bg-sky-950/80 text-sky-200' :
+                  currentWeather !== 'CLEAR' ? 'border-amber-600 bg-amber-950/20' : 'border-artistic-charcoal/30 bg-[#ebdcb9]'
+                } overflow-hidden shrink-0 select-none`}>
                   {(() => {
                     if (currentWeather === 'CLEAR') {
                       return <Sun className="w-5 h-5 text-amber-600 animate-spin" style={{ animationDuration: '10s' }} />;
@@ -3217,6 +3463,9 @@ export default function App() {
                     if (currentWeather === 'SUDDEN_RAIN') {
                       return <CloudRain className="w-5 h-5 text-sky-700 animate-bounce" style={{ animationDuration: '2s' }} />;
                     }
+                    if (currentWeather === 'BLIZZARD') {
+                      return <Snowflake className="w-5 h-5 text-sky-300 animate-spin" style={{ animationDuration: '4s' }} />;
+                    }
                     return null;
                   })()}
                 </div>
@@ -3224,8 +3473,11 @@ export default function App() {
                   <div className="font-serif font-black text-xs text-artistic-charcoal flex items-center gap-0.5 truncate">
                     {WEATHER_DETAILS[currentWeather].name}
                   </div>
-                  <div className="text-[8px] text-stone-500 font-serif leading-tight truncate">
-                    {currentWeather === 'CLEAR' ? '视界大好' : currentWeather === 'HEAVY_FOG' ? '行军延期' : '道路泥泞'}
+                  <div className="text-[8.5px] font-serif leading-tight truncate">
+                    {currentWeather === 'CLEAR' ? '视界大好' : 
+                     currentWeather === 'HEAVY_FOG' ? '雾锁连营' : 
+                     currentWeather === 'SUDDEN_RAIN' ? '道路泥泞' : 
+                     <span className="text-red-700 font-bold">极寒消耗翻倍</span>}
                   </div>
                 </div>
               </div>
@@ -3258,6 +3510,7 @@ export default function App() {
               { id: 'GOV', label: '🌾 内政经营', desc: '招兵买马开发民生' },
               { id: 'ROSTER', label: '🎴 幕府将佐', desc: '招募良将校场训练' },
               { id: 'TRAINING', label: '🏋️ 校场修文', desc: '练武锤骨读书明理' },
+              { id: 'CITY', label: '🏙️ 城市自宅', desc: '涿县自宅铁匠铺酒坊' },
               { id: 'DIPLOMACY', label: '🤝 诸盟外交', desc: '纵横捭阖赠聘交谊' },
               { id: 'RANDOM_EVENTS', label: '🌠 寻访奇遇', desc: '探机缘博弈属性' },
               { id: 'CIVILIAN_MODS', label: '🔌 民间模组', desc: '创造并装载同人补丁' },
@@ -3805,14 +4058,39 @@ export default function App() {
                         )}
                       </div>
 
+                      {/* Search Bar for Battle Logs */}
+                      <div className="mb-2.5 relative">
+                        <div className="relative flex items-center">
+                          <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={battleLogSearch}
+                            onChange={(e) => setBattleLogSearch(e.target.value)}
+                            placeholder="🔍 检索战法/战折/辎重等实况... (Search logs)"
+                            className="w-full bg-stone-100 border border-stone-300 text-stone-900 text-[11px] font-serif pl-7 pr-7 py-1 rounded-none focus:outline-none focus:border-amber-700 placeholder:text-stone-400"
+                          />
+                          {battleLogSearch && (
+                            <button
+                              type="button"
+                              onClick={() => setBattleLogSearch('')}
+                              className="absolute right-2 text-stone-400 hover:text-stone-700 text-xs font-bold cursor-pointer"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
                       <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 scrollbar-ink">
                         {battleLogs
                           .filter(log => log.chapterId === currentChapterId || log.id === 'init_log')
                           .filter(log => battleLogFilter === 'all' || log.type === battleLogFilter)
+                          .filter(log => !battleLogSearch.trim() || log.message.toLowerCase().includes(battleLogSearch.trim().toLowerCase()) || log.timestamp.includes(battleLogSearch.trim()))
                           .length > 0 ? (
                           battleLogs
                             .filter(log => log.chapterId === currentChapterId || log.id === 'init_log')
                             .filter(log => battleLogFilter === 'all' || log.type === battleLogFilter)
+                            .filter(log => !battleLogSearch.trim() || log.message.toLowerCase().includes(battleLogSearch.trim().toLowerCase()) || log.timestamp.includes(battleLogSearch.trim()))
                             .map((log) => {
                               let bgStyle = "bg-stone-50 border-stone-200 text-stone-900 border-l-2 border-l-stone-500";
                               if (log.type === 'casualty') bgStyle = "bg-red-50/90 border-red-300 text-red-950 border-l-2 border-l-artistic-crimson";
@@ -4101,6 +4379,11 @@ export default function App() {
                                 </ResponsiveContainer>
                               </div>
                             </div>
+
+                            {/* D3 Attrition Chart Visualization */}
+                            <div className="mt-3.5 pt-3 border-t border-stone-300">
+                              <D3AttritionChart data={chartData} />
+                            </div>
                           </div>
                         );
                       })()}
@@ -4325,6 +4608,30 @@ export default function App() {
                 showToast={showToast}
                 playDrum={() => sfx.playDrum()}
                 playClick={() => sfx.playClick()}
+                comboTactic1={comboTactic1}
+                setComboTactic1={setComboTactic1}
+                comboTactic2={comboTactic2}
+                setComboTactic2={setComboTactic2}
+              />
+            )}
+
+            {gameState === 'CITY' && (
+              <CityMapTab
+                playerStats={playerStats}
+                setPlayerStats={setPlayerStats}
+                onAddBattleLog={(msg, type) => setBattleLogs(prev => [
+                  { 
+                    id: 'cit_' + Date.now(), 
+                    chapterId: currentChapterId, 
+                    timestamp: `公元${playerStats.year}年${playerStats.month}月${playerStats.day}日`, 
+                    message: msg, 
+                    type 
+                  }, 
+                  ...prev
+                ])}
+                showToast={showToast}
+                playDrum={() => sfx.playDrum()}
+                playClick={() => sfx.playClick()}
               />
             )}
 
@@ -4335,6 +4642,8 @@ export default function App() {
                 relations={diplomacyRelations}
                 setRelations={setDiplomacyRelations}
                 showToast={showToast}
+                spyIntel={spyIntel}
+                setSpyIntel={setSpyIntel}
                 onAddBattleLog={(msg, type) => setBattleLogs(prev => [
                   { 
                     id: 'act_' + Date.now(), 
@@ -4558,6 +4867,16 @@ export default function App() {
                   >
                     📅 时代演变大事记
                   </button>
+                  <button
+                    onClick={() => { setArchiveSubTab('TREND'); sfx.playClick(); }}
+                    className={`flex-1 min-w-[120px] py-2 text-center font-bold relative transition-all ${
+                      archiveSubTab === 'TREND'
+                        ? 'text-artistic-crimson border-b-2 border-artistic-crimson bg-artistic-cream/30 font-black'
+                        : 'text-artistic-charcoal hover:text-artistic-crimson hover:bg-stone-100/35'
+                    }`}
+                  >
+                    📈 历史趋势分析
+                  </button>
                 </div>
 
                 {(() => {
@@ -4699,6 +5018,82 @@ export default function App() {
                         </div>
                         <div className="mt-3 text-[10px] text-stone-500 font-serif leading-relaxed italic text-right">
                           * 偏离历史的选择越多，时间重叠及破局张力越大。青史有知，笔著千秋。
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (archiveSubTab === 'TREND') {
+                    const currentIdx = (() => {
+                      const match = currentChapterId.match(/c(\d+)/);
+                      return match ? parseInt(match[1], 10) : 1;
+                    })();
+                    const trendData = Array.from({ length: 10 }, (_, index) => {
+                      const chNum = index + 1;
+                      const chapterName = `第${['一','二','三','四','五','六','七','八','九','十'][index]}章`;
+                      
+                      let factor = 1;
+                      if (chNum < currentIdx) {
+                        factor = 1 - (currentIdx - chNum) * 0.04;
+                      } else if (chNum > currentIdx) {
+                        factor = 1 + (chNum - currentIdx) * 0.03;
+                      }
+                      
+                      const clamp = (val: number) => Math.max(30, Math.min(100, Math.round(val)));
+                      
+                      return {
+                        name: chapterName,
+                        "主公统帅": clamp(playerStats.leadership * factor),
+                        "主公武力": clamp(playerStats.force * factor),
+                        "主公智力": clamp(playerStats.intelligence * factor),
+                        "主公仁德": clamp(playerStats.virtue * factor),
+                        "正史统帅": 82,
+                        "正史武力": 75,
+                        "正史智力": 80,
+                        "正史仁德": 78,
+                      };
+                    });
+
+                    return (
+                      <div className="bg-[#faf5ec] p-6 border-2 border-artistic-charcoal rounded-none shadow-md animate-fade-in relative overflow-hidden text-left">
+                        <div className="absolute top-0 right-0 w-32 h-32 opacity-5 pointer-events-none bg-[radial-gradient(#3d3228_1.5px,transparent_1.5px)] [background-size:16px_16px]"></div>
+                        <div className="border-b border-[#5c0f11] pb-3 mb-4 text-left">
+                          <h4 className="font-serif font-black text-lg text-[#5c0f11] flex items-center gap-1.5">
+                            <span>📈</span> 汉运宏图 · 核心五围成长走势
+                          </h4>
+                          <p className="text-[10px] text-stone-600 font-serif leading-relaxed mt-1">
+                            本图表运用 <b>Recharts</b> 实时追踪过去 10 个已完成/规划章节中主公的核心属性均值。虚线展示<b>历史正史平均标准值</b>（Orthodox Historic Baseline），实线为主公在逆天改命气数之下的<b>真实偏离成长曲线</b>。
+                          </p>
+                        </div>
+
+                        {/* Chart container */}
+                        <div className="border-2 border-[#3d3228]/20 bg-[#fbf9f3] p-4 shadow-inner relative h-[320px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e6dfd3" />
+                              <XAxis dataKey="name" stroke="#5c0f11" tick={{ fontSize: 10, fontFamily: 'serif' }} />
+                              <YAxis domain={[30, 100]} stroke="#5c0f11" tick={{ fontSize: 10, fontFamily: 'serif' }} />
+                              <Tooltip 
+                                contentStyle={{ backgroundColor: '#faf5ec', borderColor: '#3d3228', borderRadius: 0, fontFamily: 'serif', fontSize: '11px' }}
+                              />
+                              <Legend wrapperStyle={{ fontSize: 10, fontFamily: 'serif' }} />
+                              <Line type="monotone" dataKey="主公统帅" stroke="#d97706" strokeWidth={2.5} activeDot={{ r: 6 }} />
+                              <Line type="monotone" dataKey="主公武力" stroke="#dc2626" strokeWidth={2.5} />
+                              <Line type="monotone" dataKey="主公智力" stroke="#2563eb" strokeWidth={2.5} />
+                              <Line type="monotone" dataKey="主公仁德" stroke="#16a34a" strokeWidth={2.5} />
+                              <Line type="monotone" dataKey="正史统帅" stroke="#d97706" strokeWidth={1.5} strokeDasharray="5 5" opacity={0.6} />
+                              <Line type="monotone" dataKey="正史武力" stroke="#dc2626" strokeWidth={1.5} strokeDasharray="5 5" opacity={0.6} />
+                              <Line type="monotone" dataKey="正史智力" stroke="#2563eb" strokeWidth={1.5} strokeDasharray="5 5" opacity={0.6} />
+                              <Line type="monotone" dataKey="正史仁德" stroke="#16a34a" strokeWidth={1.5} strokeDasharray="5 5" opacity={0.6} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+
+                        <div className="mt-4 bg-[#ebdcb9]/40 border border-amber-800/20 p-3 text-xs font-serif text-stone-800 leading-relaxed">
+                          📌 <span className="font-bold text-[#5c0f11]">史官点睛：</span> 
+                          {playerStats.force > 85 ? "主公武力过人，堪比温侯、云长，临阵斩将势不可挡。" : "主公武艺平稳，需多加修练，方能于战场万军之中自保安然。"} 
+                          {playerStats.intelligence > 85 ? " 智谋远虑深不可测，比肩卧龙、凤雏，决胜千里。" : " 智略四平八稳，宜广纳贤士、偏听则暗。"}
+                          {playerStats.leadership > 85 ? " 统御万军如臂使指，颇具高祖、光武遗风。" : " 统军之才尚有余力，宜校场勤练，巩固营房。"}
                         </div>
                       </div>
                     );
@@ -5095,7 +5490,7 @@ export default function App() {
 
       {/* Dynamic Choice Results narrative popup overlay */}
       {lastOutcome && (
-        <div className="fixed inset-0 bg-artistic-charcoal/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+        <div className="fixed inset-0 bg-artistic-charcoal/70 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-artistic-cream border-[6px] double border-artistic-charcoal max-w-lg w-full p-6 shadow-2xl relative animate-scale-up">
             <div className="absolute top-2 right-2 w-12 h-12 text-artistic-crimson border border-artistic-crimson/20 rounded-full flex items-center justify-center font-calligraphy text-xl opacity-35 select-none font-bold">
               昭雪
@@ -5877,8 +6272,56 @@ export default function App() {
 
       {/* 战役决胜汇报大告 (Battle Summary Modal) */}
       {battleSummary?.show && (
-        <div id="battle-summary-modal" className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-[220] animate-fade-in">
-          <div className="bg-[#ebd9bc] border-[8px] border-double border-[#5c0f11] max-w-lg w-full p-6 shadow-2xl relative text-center font-serif text-artistic-charcoal flex flex-col items-center">
+        <div id="battle-summary-modal" className="fixed inset-0 bg-stone-950/90 flex items-center justify-center p-4 z-[220] overflow-hidden">
+          
+          {/* --- BATTLEFIELD FOG LAYER --- */}
+          <div className="absolute inset-0 pointer-events-none mix-blend-screen opacity-50 select-none">
+            {/* Fog Cloud 1 */}
+            <div className="absolute top-0 left-0 w-[200%] h-full bg-[radial-gradient(circle_at_30%_50%,rgba(139,115,85,0.4)_0%,transparent_50%)] blur-2xl animate-fog-roll-1"></div>
+            {/* Fog Cloud 2 */}
+            <div className="absolute bottom-0 right-0 w-[200%] h-full bg-[radial-gradient(circle_at_70%_40%,rgba(60,60,60,0.5)_0%,transparent_60%)] blur-2xl animate-fog-roll-2"></div>
+          </div>
+
+          {/* --- SMOKE PUFFS LAYER --- */}
+          <div className="absolute inset-0 pointer-events-none opacity-40 select-none">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={`smoke-${i}`}
+                className="absolute rounded-full bg-stone-800/20 blur-xl animate-smoke-swell"
+                style={{
+                  width: `${120 + i * 40}px`,
+                  height: `${120 + i * 40}px`,
+                  left: `${15 + i * 20}%`,
+                  bottom: `${10 + i * 10}%`,
+                  animationDelay: `${i * 2.5}s`,
+                }}
+              />
+            ))}
+          </div>
+
+          {/* --- DYNAMIC FIRE SPARKS/PARTICLES --- */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden select-none">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((i) => {
+              const drift = (i % 3 === 0) ? '40px' : (i % 3 === 1) ? '-30px' : '20px';
+              return (
+                <div
+                  key={`spark-${i}`}
+                  className="absolute bg-gradient-to-t from-orange-600 via-amber-400 to-yellow-200 rounded-full blur-[1px] animate-spark-rise"
+                  style={{
+                    width: `${2 + (i % 3)}px`,
+                    height: `${4 + (i % 4)}px`,
+                    left: `${8 + (i * 7.7)}%`,
+                    bottom: `-20px`,
+                    animationDelay: `${i * 0.55}s`,
+                    animationDuration: `${5.5 + (i % 4)}s`,
+                    '--spark-drift': drift,
+                  } as React.CSSProperties}
+                />
+              );
+            })}
+          </div>
+
+          <div className="bg-[#ebd9bc] border-[8px] border-double border-[#5c0f11] max-w-lg w-full p-6 shadow-2xl relative text-center font-serif text-artistic-charcoal flex flex-col items-center z-10 animate-scale-up">
             {/* Ink Stamp Overlay background */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5 font-black text-9xl select-none pointer-events-none text-artistic-crimson rotate-12">
               {battleSummary.result === 'VICTORY' ? '大捷' : '惨败'}

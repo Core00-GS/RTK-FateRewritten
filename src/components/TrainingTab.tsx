@@ -20,6 +20,10 @@ interface TrainingTabProps {
   playDrum: () => void;
   playClick: () => void;
   currentWeather?: 'CLEAR' | 'HEAVY_FOG' | 'SUDDEN_RAIN';
+  comboTactic1: string;
+  setComboTactic1: (val: string) => void;
+  comboTactic2: string;
+  setComboTactic2: (val: string) => void;
 }
 
 export default function TrainingTab({
@@ -33,7 +37,11 @@ export default function TrainingTab({
   showToast,
   playDrum,
   playClick,
-  currentWeather = 'CLEAR'
+  currentWeather = 'CLEAR',
+  comboTactic1,
+  setComboTactic1,
+  comboTactic2,
+  setComboTactic2
 }: TrainingTabProps) {
   const [drillLog, setDrillLog] = useState<string[]>([]);
   const [trainingStreak, setTrainingStreak] = useState<number>(0);
@@ -755,6 +763,160 @@ export default function TrainingTab({
         {/* Horizontal Divider */}
         <div className="border-t border-dashed border-[#3d3228]/35 my-3"></div>
 
+        {/* Specialized Unit Traits Section */}
+        <div>
+          <div className="border-b border-[#3d3228]/25 pb-2 mb-3">
+            <h4 className="font-serif font-black text-sm text-amber-955 flex items-center gap-1.5">
+              🎖️ 三营精锐特化兵种特质 (Specialized Unit Traits)
+            </h4>
+            <p className="text-[10.5px] text-stone-600 font-serif leading-relaxed mt-1">
+              根据地形与战役类型，改授中军主力精锐兵种。<b>特化兵种特质会在对应地形战役中大幅度削减士卒折损</b>：
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Trait 1: HEAVY_CAVALRY */}
+            <button
+              type="button"
+              onClick={() => {
+                const active = playerStats.activeUnitTrait || 'HEAVY_CAVALRY';
+                if (active !== 'HEAVY_CAVALRY') {
+                  setPlayerStats(prev => ({ ...prev, activeUnitTrait: 'HEAVY_CAVALRY' }));
+                  playDrum();
+                  showToast("🐎 中军主力特化改授为「重铠铁骑」！平原旷野冲锋免折 -25%！");
+                  onAddBattleLog("🎖️ 【兵种特质】主公亲赐符节，中军主力统编为「重铠铁骑」，平原旷野冲锋免折 25%！", "action");
+                }
+              }}
+              className={`p-3 border-2 flex flex-col justify-between text-left cursor-pointer transition-all ${
+                (playerStats.activeUnitTrait || 'HEAVY_CAVALRY') === 'HEAVY_CAVALRY'
+                  ? 'border-amber-700 bg-amber-500/15 shadow-sm'
+                  : 'border-artistic-charcoal/30 bg-[#fbf9f4] hover:bg-[#eae6db]/30'
+              }`}
+            >
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-serif font-black text-xs text-stone-900">🐎 重铠铁骑</span>
+                  {(playerStats.activeUnitTrait || 'HEAVY_CAVALRY') === 'HEAVY_CAVALRY' && (
+                    <span className="text-[8.5px] bg-amber-800 text-white px-1.5 py-0.5 font-bold font-serif animate-pulse">当前特化</span>
+                  )}
+                </div>
+                <p className="text-[10px] text-stone-700 font-serif leading-relaxed mb-2">
+                  身披重铠、手执长槊，平原横冲直撞破阵！
+                </p>
+              </div>
+              <div className="border-t border-amber-200/60 pt-1 text-[9.5px] font-serif leading-tight">
+                <span className="text-emerald-800 font-bold">🌾 平原 (PLAIN): 兵损免除 -25%</span><br />
+                <span className="text-red-700">⛰️ 山地 (MOUNTAIN): 迟滞兵损 +10%</span>
+              </div>
+            </button>
+
+            {/* Trait 2: SIEGE_ENGINEERS */}
+            <button
+              type="button"
+              onClick={() => {
+                if (playerStats.activeUnitTrait !== 'SIEGE_ENGINEERS') {
+                  setPlayerStats(prev => ({ ...prev, activeUnitTrait: 'SIEGE_ENGINEERS' }));
+                  playDrum();
+                  showToast("🏹 中军主力特化改授为「攻城械师」！城池拔寨强攻免折 -30%！");
+                  onAddBattleLog("🎖️ 【兵种特质】主公亲赐符节，中军主力统编为「攻城械师」，城池强攻破壁免折 30%！", "action");
+                }
+              }}
+              className={`p-3 border-2 flex flex-col justify-between text-left cursor-pointer transition-all ${
+                playerStats.activeUnitTrait === 'SIEGE_ENGINEERS'
+                  ? 'border-rose-700 bg-rose-500/15 shadow-sm'
+                  : 'border-artistic-charcoal/30 bg-[#fbf9f4] hover:bg-[#eae6db]/30'
+              }`}
+            >
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-serif font-black text-xs text-stone-900">🏹 攻城械师</span>
+                  {playerStats.activeUnitTrait === 'SIEGE_ENGINEERS' && (
+                    <span className="text-[8.5px] bg-rose-800 text-white px-1.5 py-0.5 font-bold font-serif animate-pulse">当前特化</span>
+                  )}
+                </div>
+                <p className="text-[10px] text-stone-700 font-serif leading-relaxed mb-2">
+                  推造霹雳投石机与冲车，坚城高墙克星！
+                </p>
+              </div>
+              <div className="border-t border-rose-200/60 pt-1 text-[9.5px] font-serif leading-tight">
+                <span className="text-emerald-800 font-bold">🏛️ 攻城 (CITY): 兵损免除 -30%</span><br />
+                <span className="text-stone-600">摧城拔寨，高墙压制</span>
+              </div>
+            </button>
+
+            {/* Trait 3: MOUNTAINEERS */}
+            <button
+              type="button"
+              onClick={() => {
+                if (playerStats.activeUnitTrait !== 'MOUNTAINEERS') {
+                  setPlayerStats(prev => ({ ...prev, activeUnitTrait: 'MOUNTAINEERS' }));
+                  playDrum();
+                  showToast("⛰️ 中军主力特化改授为「山地藤甲兵」！山地密林攀岩伏击免折 -25%！");
+                  onAddBattleLog("🎖️ 【兵种特质】主公亲赐符节，中军主力统编为「山地藤甲兵」，山地密林伏击免折 25%！", "action");
+                }
+              }}
+              className={`p-3 border-2 flex flex-col justify-between text-left cursor-pointer transition-all ${
+                playerStats.activeUnitTrait === 'MOUNTAINEERS'
+                  ? 'border-emerald-700 bg-emerald-500/15 shadow-sm'
+                  : 'border-artistic-charcoal/30 bg-[#fbf9f4] hover:bg-[#eae6db]/30'
+              }`}
+            >
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-serif font-black text-xs text-stone-900">⛰️ 山地藤甲兵</span>
+                  {playerStats.activeUnitTrait === 'MOUNTAINEERS' && (
+                    <span className="text-[8.5px] bg-emerald-800 text-white px-1.5 py-0.5 font-bold font-serif animate-pulse">当前特化</span>
+                  )}
+                </div>
+                <p className="text-[10px] text-stone-700 font-serif leading-relaxed mb-2">
+                  身穿油浸藤甲，履险如平地，蜀山险峰利刃！
+                </p>
+              </div>
+              <div className="border-t border-emerald-200/60 pt-1 text-[9.5px] font-serif leading-tight">
+                <span className="text-emerald-800 font-bold">⛰️ 山地 (MOUNTAIN): 兵损免除 -25%</span><br />
+                <span className="text-emerald-800 font-bold">🌲 密林 (FOREST): 兵损免除 -20%</span>
+              </div>
+            </button>
+
+            {/* Trait 4: NAVAL_MARINES */}
+            <button
+              type="button"
+              onClick={() => {
+                if (playerStats.activeUnitTrait !== 'NAVAL_MARINES') {
+                  setPlayerStats(prev => ({ ...prev, activeUnitTrait: 'NAVAL_MARINES' }));
+                  playDrum();
+                  showToast("🌊 中军主力特化改授为「水军舟楫卒」！江河水战横渡免折 -25%！");
+                  onAddBattleLog("🎖️ 【兵种特质】主公亲赐符节，中军主力统编为「水军舟楫卒」，江河水战横渡免折 25%！", "action");
+                }
+              }}
+              className={`p-3 border-2 flex flex-col justify-between text-left cursor-pointer transition-all ${
+                playerStats.activeUnitTrait === 'NAVAL_MARINES'
+                  ? 'border-sky-700 bg-sky-500/15 shadow-sm'
+                  : 'border-artistic-charcoal/30 bg-[#fbf9f4] hover:bg-[#eae6db]/30'
+              }`}
+            >
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-serif font-black text-xs text-stone-900">🌊 水军舟楫卒</span>
+                  {playerStats.activeUnitTrait === 'NAVAL_MARINES' && (
+                    <span className="text-[8.5px] bg-sky-800 text-white px-1.5 py-0.5 font-bold font-serif animate-pulse">当前特化</span>
+                  )}
+                </div>
+                <p className="text-[10px] text-stone-700 font-serif leading-relaxed mb-2">
+                  精熟水性，驾艨艟战舰横渡大江大河！
+                </p>
+              </div>
+              <div className="border-t border-sky-200/60 pt-1 text-[9.5px] font-serif leading-tight">
+                <span className="text-sky-800 font-bold">🌊 江河 (RIVER): 兵损免除 -25%</span><br />
+                <span className="text-sky-800 font-bold">水战破浪，横江锁天</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Horizontal Divider */}
+        <div className="border-t border-dashed border-[#3d3228]/35 my-3"></div>
+
         {/* Formation Selection Block */}
         <div>
           <div className="border-b border-[#3d3228]/25 pb-2 mb-3">
@@ -881,6 +1043,90 @@ export default function TrainingTab({
               </div>
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* 战术组合预设/连携军策 Camp */}
+      <div className="bg-[#f3edd7] border-2 border-[#5c0f11]/60 p-5 rounded-none flex flex-col gap-4 text-left">
+        <div className="border-b border-[#5c0f11]/30 pb-2">
+          <h4 className="font-serif font-black text-sm text-[#5c0f11] flex items-center gap-1.5">
+            🔥 阵前双璧 · 连携战法兵营组合 (Combo Tactics Preset Camp)
+          </h4>
+          <p className="text-[10.5px] text-stone-600 font-serif leading-relaxed mt-1">
+            主公可预先编组两套战法。后续在故事（STORY）会战中，按下 <b className="text-artistic-crimson underline font-mono text-[11px]">快捷键 [Q]</b> 即可瞬间一键触发双璧战术叠加的惊天连携效果！
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Slot 1 Tactic Choice */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10.5px] font-serif font-black text-stone-850 flex items-center gap-1">
+              🛡️ 连携左先锋战法 (Tactic 1):
+            </label>
+            <select
+              value={comboTactic1}
+              onChange={(e) => {
+                const val = e.target.value;
+                setComboTactic1(val);
+                localStorage.setItem('tk_combo_tactic_1', val);
+                playClick();
+                showToast(`🛡️ 连携左战法已预设为「${val}」！`);
+              }}
+              className="bg-white border-2 border-artistic-charcoal p-2 text-xs font-serif text-stone-900 rounded-none focus:outline-none focus:border-artistic-crimson"
+            >
+              {['背水一战', '锋矢阵', '暗度陈仓', '围魏救赵', '釜底抽薪', '火烧连营'].map((t) => (
+                <option key={t} value={t} disabled={t === comboTactic2}>
+                  ⚔️ {t}
+                </option>
+              ))}
+            </select>
+            <p className="text-[9px] text-stone-500 font-serif">
+              {comboTactic1 === '背水一战' && "【背水一战】: 置之死地，临阵武勇 +3 点，提升全军狂热气魄。"}
+              {comboTactic1 === '锋矢阵' && "【锋矢阵】: 锋矢破敌，收容俘获、流散兵卒 300 人充实军营。"}
+              {comboTactic1 === '暗度陈仓' && "【暗度陈仓】: 奇兵绕后突击中军辎重，缴获府库黄金 200 金。"}
+              {comboTactic1 === '围魏救赵' && "【围魏救赵】: 围堵敌部解围盟邦，中兴威望增加 25 点。"}
+              {comboTactic1 === '釜底抽薪' && "【釜底抽薪】: 釜底抽薪截断敌饷，吸纳 150 兵并劫走 100 金。"}
+              {comboTactic1 === '火烧连营' && "【火烧连营】: 火烧连营极大威慑敌国，武勇 +1，威望 +20。"}
+            </p>
+          </div>
+
+          {/* Slot 2 Tactic Choice */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10.5px] font-serif font-black text-stone-850 flex items-center gap-1">
+              🏹 连携右骁骑战法 (Tactic 2):
+            </label>
+            <select
+              value={comboTactic2}
+              onChange={(e) => {
+                const val = e.target.value;
+                setComboTactic2(val);
+                localStorage.setItem('tk_combo_tactic_2', val);
+                playClick();
+                showToast(`🏹 连携右战法已预设为「${val}」！`);
+              }}
+              className="bg-white border-2 border-artistic-charcoal p-2 text-xs font-serif text-stone-900 rounded-none focus:outline-none focus:border-artistic-crimson"
+            >
+              {['背水一战', '锋矢阵', '暗度陈仓', '围魏救赵', '釜底抽薪', '火烧连营'].map((t) => (
+                <option key={t} value={t} disabled={t === comboTactic1}>
+                  ⚔️ {t}
+                </option>
+              ))}
+            </select>
+            <p className="text-[9px] text-stone-500 font-serif">
+              {comboTactic2 === '背水一战' && "【背水一战】: 置之死地，临阵武勇 +3 点，提升全军狂热气魄。"}
+              {comboTactic2 === '锋矢阵' && "【锋矢阵】: 锋矢破敌，收容俘获、流散兵卒 300 人充实军营。"}
+              {comboTactic2 === '暗度陈仓' && "【暗度陈仓】: 奇兵绕后突击中军辎重，缴获府库黄金 200 金。"}
+              {comboTactic2 === '围魏救赵' && "【围魏救赵】: 围堵敌部解围盟邦，中兴威望增加 25 点。"}
+              {comboTactic2 === '釜底抽薪' && "【釜底抽薪】: 釜底抽薪截断敌饷，吸纳 150 兵并劫走 100 金。"}
+              {comboTactic2 === '火烧连营' && "【火烧连营】: 火烧连营极大威慑敌国，武勇 +1，威望 +20。"}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-amber-100/45 p-2.5 border border-amber-900/10 text-[9.5px] font-serif text-stone-750 flex items-center gap-2">
+          <span>🔥 连携出鞘组合:</span>
+          <strong className="text-artistic-crimson text-xs">『 {comboTactic1} 』 + 『 {comboTactic2} 』</strong>
+          <span>(快捷一键连携具有 15 秒施计冷却)</span>
         </div>
       </div>
 
